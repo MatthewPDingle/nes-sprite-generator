@@ -6,6 +6,10 @@ A Python tool for generating 8-bit NES-style pixel art sprites using LLMs.
 
 NES Sprite Generator leverages LLMs to create pixel art that hopefully is reminiscent of the Nintendo Entertainment System (8-bit) era. Generate characters, items, enemies, and other game assets that look like they came straight from the 1980s.
 
+## WTF?
+
+Why don't I just use a text-to-image model?  All the LoRAs I tried couldn't guarantee strict pixel art adherence and are tricky to fix. ComfyUI workflows are an insane mess.  I thought I'd let the LLMs have a go since many are getting good at vector and ascii art.
+
 ## Features
 
 - Generate NES-inspired pixel art sprites using AI
