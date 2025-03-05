@@ -17,7 +17,7 @@ NES Sprite Generator leverages LLMs to create pixel art that hopefully is remini
 ## Quality Assessments
 - gpt-4o - OK quality, but abstract and often not good with prompt adherence
 - gpt-4o-mini - Generally trash
-- gpt-5-preview - Surprisingly poor quality, often producing very short characters
+- gpt-4.5-preview - Surprisingly poor quality, often producing very short characters
 - o3-mini-low - Decent quality, often wide characters
 - o3-mini-medium - Decent quality, often wide characters
 - o3-mini-high - Decent quality, often wide characters
