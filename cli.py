@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any
 
 from .generator import PixelArtGenerator
-from pixelart import AVAILABLE_MODELS
+from . import AVAILABLE_MODELS
 
 
 # Set up basic logging

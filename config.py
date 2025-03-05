@@ -19,11 +19,14 @@ def load_api_keys(file_path="apikeys.txt"):
     # First try environment variables
     openai_key = os.environ.get("OPENAI_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    google_key = os.environ.get("GOOGLE_API_KEY")
     
     if openai_key:
         api_keys["OPENAI_API_KEY"] = openai_key
     if anthropic_key:
         api_keys["ANTHROPIC_API_KEY"] = anthropic_key
+    if google_key:
+        api_keys["GOOGLE_API_KEY"] = google_key
     
     # Then try the file
     try:
@@ -37,7 +40,7 @@ def load_api_keys(file_path="apikeys.txt"):
                     except ValueError:
                         logger.warning(f"Invalid line in {file_path}: {line}")
     except FileNotFoundError:
-        if not (openai_key or anthropic_key):
+        if not any([openai_key, anthropic_key, google_key]):
             logger.warning(f"API keys file not found: {file_path}")
     
     return api_keys
@@ -47,7 +50,7 @@ def get_api_key(service, api_keys=None):
     Get API key for a specific service.
     
     Args:
-        service: Service name (e.g., "OPENAI" or "ANTHROPIC")
+        service: Service name (e.g., "OPENAI", "ANTHROPIC", or "GOOGLE")
         api_keys: Optional dictionary with API keys
         
     Returns:

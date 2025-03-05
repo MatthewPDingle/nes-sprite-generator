@@ -5,6 +5,7 @@ from typing import Optional
 from .clients.base import BaseClient
 from .clients.openai_client import OpenAIClient
 from .clients.anthropic_client import AnthropicClient
+from .clients.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,8 @@ logger = logging.getLogger(__name__)
 CLIENT_MAP = {
     "gpt": OpenAIClient,
     "o3": OpenAIClient,
-    "claude": AnthropicClient
+    "claude": AnthropicClient,
+    "gemini": GeminiClient
 }
 
 def create_client(model: str, api_key: Optional[str] = None) -> BaseClient:
@@ -54,7 +56,12 @@ AVAILABLE_MODELS = {
     "claude-3-7-sonnet-20250219": "Anthropic Claude 3.7 Sonnet",
     "claude-3-7-sonnet-low": "Claude 3.7 Sonnet with low extended thinking",
     "claude-3-7-sonnet-medium": "Claude 3.7 Sonnet with medium extended thinking",
-    "claude-3-7-sonnet-high": "Claude 3.7 Sonnet with high extended thinking"
+    "claude-3-7-sonnet-high": "Claude 3.7 Sonnet with high extended thinking",
+    
+    # Google Gemini models
+    "gemini-2.0-flash": "Google Gemini 2.0 Flash - fast responses (supports function calling)",
+    "gemini-2.0-pro-exp-02-05": "Google Gemini 2.0 Pro - more advanced reasoning (supports function calling)",
+    "gemini-2.0-flash-thinking-exp-01-21": "Google Gemini 2.0 Flash with enhanced thinking capabilities (text-based approach)"
 }
 
 def list_available_models():
@@ -64,6 +71,7 @@ def list_available_models():
     # Group by provider
     openai_models = [m for m in AVAILABLE_MODELS.keys() if m.startswith(("gpt", "o3"))]
     anthropic_models = [m for m in AVAILABLE_MODELS.keys() if m.startswith("claude")]
+    gemini_models = [m for m in AVAILABLE_MODELS.keys() if m.startswith("gemini")]
     
     result += "\nOpenAI Models:\n"
     for model in sorted(openai_models):
@@ -71,6 +79,10 @@ def list_available_models():
     
     result += "\nAnthropic Models:\n"
     for model in sorted(anthropic_models):
+        result += f"  - {model}: {AVAILABLE_MODELS[model]}\n"
+    
+    result += "\nGoogle Gemini Models:\n"
+    for model in sorted(gemini_models):
         result += f"  - {model}: {AVAILABLE_MODELS[model]}\n"
     
     return result

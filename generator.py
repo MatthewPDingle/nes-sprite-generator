@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any
 
-from pixelart import create_client, AVAILABLE_MODELS
+from . import create_client, AVAILABLE_MODELS
 from .image_utils import (
     render_pixel_grid, post_process_image,
     fix_dimensions, analyze_content_dimensions
