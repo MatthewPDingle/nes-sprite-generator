@@ -15,22 +15,20 @@ NES Sprite Generator leverages LLMs to create pixel art that hopefully is remini
 - Configurable output formats and sizes
 
 ## Quality Assessments
-gpt-4o - OK quality, but abstract and often not good with prompt adherence
-gpt-4o-mini - Generally trash
-gpt-5-preview - Surprisingly poor quality, often producing very short characters
-o3-mini-low - Decent quality, often wide characters
-o3-mini-medium - Decent quality, often wide characters
-o3-mini-high - Decent quality, often wide characters
-
-claude-3-opus-20240229 - Abstract, poor prompt adherence
-claude-3-7-sonnet-20250219 - High quality
-claude-3-7-sonnet-low - Sweet spot.  High quality with limited thinking budget
-claude-3-7-sonnet-medium - High quality but not really any better than low thinking budget
-claude-3-7-sonnet-high - High quality but not really any better than low thinking budget
-
-gemini-2.0-flash - Generally trash, often produces all black characters
-gemini-2.0-pro-exp-02-05 - Sometimes decent, but often produces all black characters
-gemini-2.0-flash-thinking-exp-01-21 - Poor quality, undetailed, and often poor prompt adherence
+- gpt-4o - OK quality, but abstract and often not good with prompt adherence
+- gpt-4o-mini - Generally trash
+- gpt-5-preview - Surprisingly poor quality, often producing very short characters
+- o3-mini-low - Decent quality, often wide characters
+- o3-mini-medium - Decent quality, often wide characters
+- o3-mini-high - Decent quality, often wide characters
+- claude-3-opus-20240229 - Abstract, poor prompt adherence
+- claude-3-7-sonnet-20250219 - High quality
+- claude-3-7-sonnet-low - Sweet spot.  High quality with limited thinking budget
+- claude-3-7-sonnet-medium - High quality but not really any better than low thinking budget
+- claude-3-7-sonnet-high - High quality but not really any better than low thinking budget
+- gemini-2.0-flash - Generally trash, often produces all black characters
+- gemini-2.0-pro-exp-02-05 - Sometimes decent, but often produces all black characters
+- gemini-2.0-flash-thinking-exp-01-21 - Poor quality, undetailed, and often poor prompt adherence
 
 Check out the examples in the sample outputs directory!
 
