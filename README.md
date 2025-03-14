@@ -42,10 +42,12 @@ Options:
 
 ```bash
 # Start the web server
-python -m nes_sprite_generator.webapp.app
+python run_webapp.py
 ```
 
 Then open http://localhost:5000 in your browser.
+
+![NES Sprite Generator Web Interface](nes-sprite-generator-screenshot.png)
 
 ## API Usage
 
