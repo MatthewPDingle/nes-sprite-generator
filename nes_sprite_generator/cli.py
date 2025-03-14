@@ -29,16 +29,18 @@ def process_single_version(version, args, total_versions):
         Dictionary with results and metadata
     """
     try:
-        # Adjust output filename for multiple versions
+        # Adjust output filename for multiple versions with model name
+        base, ext = os.path.splitext(args.output)
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        model_name = args.model.replace("/", "-").replace(":", "-")
+        
         if total_versions > 1:
-            base, ext = os.path.splitext(args.output)
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S") + f"_{version}"
-            version_output = f"{base}_{timestamp}{ext}"
+            version_output = f"{model_name}_{timestamp}_{version}{ext}"
             logger.info(f"Starting generation of version {version}/{total_versions}...")
         else:
-            version_output = args.output
+            version_output = f"{model_name}_{timestamp}{ext}"
         
-        # Generate the sprite
+        # Generate the sprite - post-process by default unless explicitly disabled
         result = generate_sprite(
             prompt=args.prompt,
             width=args.width,
@@ -46,7 +48,10 @@ def process_single_version(version, args, total_versions):
             colors=args.colors,
             model=args.model,
             output=version_output,
-            style=args.style
+            style=args.style,
+            scale=args.scale,
+            post_process=not args.no_post_process,
+            resize_method=args.resize_method
         )
         
         # Verify the success of the generation
@@ -72,12 +77,14 @@ def process_single_version(version, args, total_versions):
         logger.error(f"Error processing version {version}: {e}")
         # Try to determine output filename even in case of error
         output_file = None
+        base, ext = os.path.splitext(args.output)
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        model_name = args.model.replace("/", "-").replace(":", "-")
+        
         if total_versions > 1:
-            base, ext = os.path.splitext(args.output)
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S") + f"_{version}"
-            output_file = f"{base}_{timestamp}{ext}"
+            output_file = f"{model_name}_{timestamp}_{version}{ext}"
         else:
-            output_file = args.output
+            output_file = f"{model_name}_{timestamp}{ext}"
             
         return {
             "version": version,
@@ -170,6 +177,15 @@ def handle_single_command(args):
                 print(f"\nVersion {version}:")
                 print(f"Image: {output_file}")
                 
+                # Show dimensions information if available
+                if "dimensions" in result and "image_dimensions" in result:
+                    grid_width, grid_height = result["dimensions"]
+                    img_width, img_height = result["image_dimensions"]
+                    scale = result.get("scale", 1)
+                    print(f"Dimensions: {grid_width}x{grid_height} pixels")
+                    if scale > 1:
+                        print(f"Image size: {img_width}x{img_height} pixels (scaled {scale}x for visibility)")
+                
                 # Safely access the palette information
                 if "palette" in pixel_data:
                     print(f"Palette: {len(pixel_data['palette'])} colors used out of {args.colors} maximum")
@@ -190,6 +206,16 @@ def handle_single_command(args):
             pixel_data = result["pixel_data"]
             print(f"\nPixel Art Generation Complete!")
             print(f"Image: {result['output_file']}")
+            
+            # Show dimensions information
+            if "dimensions" in result and "image_dimensions" in result:
+                grid_width, grid_height = result["dimensions"]
+                img_width, img_height = result["image_dimensions"]
+                scale = result.get("scale", 1)
+                print(f"\nDimensions: {grid_width}x{grid_height} pixels")
+                if scale > 1:
+                    print(f"Image size: {img_width}x{img_height} pixels (scaled {scale}x for visibility)")
+            
             print("\nExplanation:")
             print(pixel_data.get("explanation", "No explanation provided"))
             
@@ -231,12 +257,14 @@ def main():
     single_parser.add_argument("--output", type=str, default="pixel_art.png", help="Output file name")
     single_parser.add_argument("--model", type=str, default="gpt-4o", help="AI model to use")
     single_parser.add_argument("--versions", type=int, default=1, help="Number of versions to generate")
-    single_parser.add_argument("--post-process", action="store_true", help="Post-process the image to fit content to desired dimensions")
+    single_parser.add_argument("--no-post-process", action="store_true", help="Disable automatic post-processing of the image to fit content to desired dimensions")
     single_parser.add_argument("--resize-method", type=str, default="nearest", 
                               choices=["nearest", "bilinear", "bicubic", "lanczos"], 
                               help="Method to use for resizing during post-processing")
     single_parser.add_argument("--max-workers", type=int, default=None, 
                               help="Maximum number of parallel workers for generation (default: auto-selected based on model)")
+    single_parser.add_argument("--scale", type=int, default=1,
+                              help="Scale factor for the output image (1=actual pixel size, 8=8x larger for better visibility)")
     single_parser.set_defaults(func=handle_single_command)
     
     # Parser for listing available models

@@ -196,6 +196,146 @@ def find_nearest_color(color: str, palette: List[str]) -> str:
     """Find the nearest color in the palette to the given color."""
     return min(palette, key=lambda c: color_distance(color, c))
 
+def find_content_boundaries(pixel_grid: PixelGrid) -> tuple[int, int, int, int]:
+    """
+    Find the boundaries of the actual content in a pixel grid, ignoring transparent pixels.
+    
+    Args:
+        pixel_grid: The pixel grid to analyze
+        
+    Returns:
+        Tuple of (min_x, max_x, min_y, max_y) content boundaries
+    """
+    height = len(pixel_grid)
+    width = len(pixel_grid[0]) if height > 0 else 0
+    
+    # Initialize bounds to extreme values
+    min_x, max_x, min_y, max_y = width, 0, height, 0
+    has_content = False
+    
+    # Scan the grid for non-transparent pixels
+    for y in range(height):
+        for x in range(width):
+            if pixel_grid[y][x] is not None:
+                min_x = min(min_x, x)
+                max_x = max(max_x, x)
+                min_y = min(min_y, y)
+                max_y = max(max_y, y)
+                has_content = True
+    
+    # If no content found, return full dimensions
+    if not has_content:
+        return 0, width - 1, 0, height - 1
+        
+    return min_x, max_x, min_y, max_y
+
+def smart_resize(pixel_grid: PixelGrid, target_width: int, target_height: int, 
+               method: str = "nearest") -> PixelGrid:
+    """
+    Smart resize that:
+    1. Detects the actual content boundaries (ignoring transparent pixels)
+    2. Crops to that content
+    3. Resizes while preserving aspect ratio
+    4. Centers horizontally and aligns to bottom
+    
+    Args:
+        pixel_grid: Original pixel grid
+        target_width: Desired width
+        target_height: Desired height
+        method: Resizing method ('nearest', 'bilinear', etc.)
+        
+    Returns:
+        A smartly resized pixel grid
+    """
+    height = len(pixel_grid)
+    width = len(pixel_grid[0]) if height > 0 else 0
+    
+    # Step 1: Find the content boundaries
+    min_x, max_x, min_y, max_y = find_content_boundaries(pixel_grid)
+    
+    # Calculate content dimensions
+    content_width = max_x - min_x + 1
+    content_height = max_y - min_y + 1
+    
+    logging.info(f"Detected content dimensions: {content_width}x{content_height}")
+    
+    # Step 2: Create a new grid with just the content
+    content_grid = []
+    for y in range(min_y, max_y + 1):
+        row = []
+        for x in range(min_x, max_x + 1):
+            row.append(pixel_grid[y][x])
+        content_grid.append(row)
+    
+    # Step 3: Calculate scaling factor to preserve aspect ratio
+    width_ratio = target_width / content_width
+    height_ratio = target_height / content_height
+    
+    # Use the smaller ratio to ensure the image fits within the canvas
+    scale_ratio = min(width_ratio, height_ratio)
+    
+    # Calculate the new dimensions after scaling
+    new_width = max(1, int(content_width * scale_ratio))
+    new_height = max(1, int(content_height * scale_ratio))
+    
+    logging.info(f"Scaling content with ratio {scale_ratio:.2f} to {new_width}x{new_height}")
+    
+    # Step 4: Resize the content grid
+    # Convert to PIL image for resizing
+    temp_palette = []
+    color_map = {}
+    
+    # Create a PIL image from the content grid
+    content_img = Image.new("RGBA", (content_width, content_height), (0, 0, 0, 0))
+    for y in range(content_height):
+        for x in range(content_width):
+            color = content_grid[y][x]
+            if color is not None:
+                if color.startswith('#'):
+                    r = int(color[1:3], 16)
+                    g = int(color[3:5], 16)
+                    b = int(color[5:7], 16)
+                    content_img.putpixel((x, y), (r, g, b, 255))
+    
+    # Choose the right resampling method
+    resampling_methods = {
+        "nearest": Image.Resampling.NEAREST,
+        "bilinear": Image.Resampling.BILINEAR, 
+        "bicubic": Image.Resampling.BICUBIC,
+        "lanczos": Image.Resampling.LANCZOS
+    }
+    resampling = resampling_methods.get(method, Image.Resampling.NEAREST)
+    
+    # Resize the content
+    resized_img = content_img.resize((new_width, new_height), resampling)
+    
+    # Step 5: Position the resized content in the target grid
+    final_img = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
+    
+    # Determine positioning (center horizontally, bottom aligned)
+    x_offset = (target_width - new_width) // 2
+    y_offset = target_height - new_height  # Bottom align
+    
+    # Paste the resized image onto the canvas
+    final_img.paste(resized_img, (x_offset, y_offset), resized_img)
+    
+    # Step 6: Convert back to pixel grid format
+    new_grid = []
+    for y in range(target_height):
+        new_row = []
+        for x in range(target_width):
+            pixel = final_img.getpixel((x, y))
+            if pixel[3] == 0:
+                # Transparent
+                new_row.append(None)
+            else:
+                # Convert RGB to hex
+                hex_color = f"#{pixel[0]:02x}{pixel[1]:02x}{pixel[2]:02x}"
+                new_row.append(hex_color)
+        new_grid.append(new_row)
+    
+    return new_grid
+
 def ensure_dimensions(pixel_grid: PixelGrid, target_width: int, target_height: int, 
                      method: str = "nearest") -> PixelGrid:
     """
@@ -217,6 +357,14 @@ def ensure_dimensions(pixel_grid: PixelGrid, target_width: int, target_height: i
     # No change needed if dimensions already match
     if current_width == target_width and current_height == target_height:
         return pixel_grid
+    
+    # Use smart resize if we need to adjust dimensions and content may not fill the canvas
+    if method != "simple":
+        # Try using the smart resize that preserves aspect ratio and aligns content
+        try:
+            return smart_resize(pixel_grid, target_width, target_height, method)
+        except Exception as e:
+            logging.warning(f"Smart resize failed: {e}. Falling back to basic resize.")
     
     # For very simple cases (adding/removing rows/columns), handle directly
     if method == "nearest" and (

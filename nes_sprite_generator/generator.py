@@ -13,6 +13,24 @@ from .image_utils import render_pixel_grid, optimize_colors, ensure_dimensions
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+def rgba_to_hex(rgba):
+    """Convert RGBA array [r,g,b,a] to hex string '#RRGGBB' format.
+    Drops alpha channel since the hex format used doesn't support it."""
+    if not isinstance(rgba, list) or len(rgba) < 3:
+        return None  # Return None for transparent or invalid values
+    
+    r, g, b = rgba[0], rgba[1], rgba[2]
+    # Ensure values are in valid range
+    r = max(0, min(255, r))
+    g = max(0, min(255, g))
+    b = max(0, min(255, b))
+    
+    # Check if fully transparent (a == 0)
+    if len(rgba) >= 4 and rgba[3] == 0:
+        return None
+    
+    return f"#{r:02x}{g:02x}{b:02x}"
+
 class PixelArtGenerator:
     """Class for generating pixel art using AI models."""
     
@@ -43,11 +61,7 @@ class PixelArtGenerator:
         Returns:
             Dictionary containing the pixel grid and palette
         """
-        # Construct the detailed prompt
-        system_prompt = self._get_system_prompt(width, height, max_colors, style)
-        user_prompt = f"Create pixel art of: {prompt}"
-        
-        # Call the AI model
+        # Call the AI model through client - it will handle appropriate prompting
         try:
             logger.info(f"Calling {self.model} to generate pixel art of: {prompt}")
             result = self.client.generate_pixel_grid(
@@ -58,7 +72,50 @@ class PixelArtGenerator:
                 style=style
             )
             
-            logger.info(f"Successfully generated pixel art response")
+            # Verify we have required fields
+            if "pixel_grid" not in result or "palette" not in result:
+                logger.warning("Missing required fields in response, attempting to repair")
+                # Ensure we have pixel_grid and palette
+                if "pixel_grid" not in result:
+                    result["pixel_grid"] = []
+                if "palette" not in result:
+                    result["palette"] = []
+            
+            # Additional check for grid structure
+            grid = result.get("pixel_grid", [])
+            if grid and all(isinstance(row, list) for row in grid):
+                logger.info(f"Successfully generated pixel art grid of size {len(grid)}x{len(grid[0]) if grid else 0}")
+            else:
+                logger.error(f"Generated grid has incorrect format: {type(grid)}")
+            
+            # Convert RGBA arrays to hex strings if needed
+            # First, determine if we're dealing with RGBA arrays or hex strings
+            uses_rgba_format = False
+            if grid and grid[0] and isinstance(grid[0][0], list):
+                uses_rgba_format = True
+                logger.info("Detected RGBA array format, converting to hex strings")
+            
+            if uses_rgba_format:
+                # Convert pixel grid from RGBA arrays to hex strings
+                converted_grid = []
+                for row in grid:
+                    converted_row = []
+                    for pixel in row:
+                        converted_row.append(rgba_to_hex(pixel))
+                    converted_grid.append(converted_row)
+                result["pixel_grid"] = converted_grid
+                
+                # Convert palette from RGBA arrays to hex strings
+                palette = result.get("palette", [])
+                if palette and isinstance(palette[0], list):
+                    converted_palette = []
+                    for color in palette:
+                        hex_color = rgba_to_hex(color)
+                        if hex_color:  # Skip fully transparent colors in palette
+                            converted_palette.append(hex_color)
+                    result["palette"] = converted_palette
+                    logger.info(f"Converted {len(palette)} palette colors to hex format")
+            
             return result
         except Exception as e:
             logger.error(f"Error generating pixel art: {e}")
@@ -67,7 +124,7 @@ class PixelArtGenerator:
     def process_image(self, pixel_data: Dict[str, Any], output_file: str, 
                      post_process: bool = True, target_width: Optional[int] = None, 
                      target_height: Optional[int] = None, resize_method: str = "nearest",
-                     max_colors: Optional[int] = None) -> Dict[str, Any]:
+                     max_colors: Optional[int] = None, scale: int = 1) -> Dict[str, Any]:
         """
         Process the pixel data and save it as an image.
         
@@ -79,6 +136,7 @@ class PixelArtGenerator:
             target_height: Target height for post-processing
             resize_method: Method to use for resizing ("nearest", "bilinear", etc.)
             max_colors: Maximum number of colors (for palette optimization)
+            scale: Scale factor for the output image (1=actual size, 8=8x for visibility)
             
         Returns:
             Dictionary with information about the saved image
@@ -124,14 +182,24 @@ class PixelArtGenerator:
         os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
         
         # Render and save the image
-        img = render_pixel_grid(pixel_grid, palette, scale=8)  # 8x scale for better visibility
+        img = render_pixel_grid(pixel_grid, palette, scale=scale)
         img.save(output_file)
+        
+        # Current pixel grid dimensions
+        grid_width = len(pixel_grid[0]) if pixel_grid else 0
+        grid_height = len(pixel_grid)
+        
+        # Image dimensions after scaling
+        image_width = grid_width * scale
+        image_height = grid_height * scale
         
         return {
             "output": output_file,
-            "dimensions": (len(pixel_grid[0]), len(pixel_grid)),
+            "dimensions": (grid_width, grid_height),
             "original_dimensions": (orig_width, orig_height),
-            "colors": len(palette)
+            "image_dimensions": (image_width, image_height),
+            "colors": len(palette),
+            "scale": scale
         }
     
     def _get_system_prompt(self, width: int, height: int, max_colors: int, style: str) -> str:

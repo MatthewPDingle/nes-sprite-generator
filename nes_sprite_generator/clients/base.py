@@ -5,7 +5,7 @@ class BaseClient(ABC):
     """Base class for AI service clients."""
     
     @abstractmethod
-    def generate_pixel_grid(self, prompt, width, height, max_colors, style, feedback=None):
+    def generate_pixel_grid(self, prompt, width, height, max_colors, style):
         """
         Generate a pixel grid representation using the AI service.
         
@@ -15,7 +15,6 @@ class BaseClient(ABC):
             height: Height of the pixel canvas
             max_colors: Maximum number of unique colors to use
             style: Style guide for the pixel art
-            feedback: Optional feedback from previous iteration for refinement
             
         Returns:
             Dictionary containing the pixel grid, palette, and metadata

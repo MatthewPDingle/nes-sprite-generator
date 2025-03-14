@@ -488,9 +488,22 @@ class AnthropicClient(BaseClient):
                 # Replace [...] with an empty array []
                 json_content = json_content.replace("[...]", "[]")
             
-            # Replace other potential truncation markers
+            # Replace incomplete arrays like [1,2,3,... with [1,2,3]
+            json_content = re.sub(r'\[(.*?),\s*\.\.\.', r'[\1]', json_content)
+            
+            # Replace any truncation markers
             json_content = re.sub(r'\[\s*\.\.\.\s*\]', '[]', json_content)
             json_content = re.sub(r'\[\s*etc\.\s*\]', '[]', json_content)
+            
+            # Find and fix truncated arrays (cases like [[1,2,3,...)
+            json_content = re.sub(r'\[\[(.*?),\s*\.\.\.', r'[[\1]', json_content)
+            
+            # Fix truncated RGBA arrays (specific to pixel art format)
+            json_content = re.sub(r'\[(\d+,\d+,\d+),\s*\.\.\.', r'[\1,0]', json_content)
+            
+            # Try to repair any array with missing items
+            # This fixes issues like [0,0,0,0],[0,0,0,0],[0,... -> [0,0,0,0],[0,0,0,0]]
+            json_content = re.sub(r'(\[\d+,\d+,\d+,\d+\]),\s*\[\.\.\.|(\[\d+,\d+,\d+,\d+\]),\s*\.\.\.', r'\1]', json_content)
             
             # Remove trailing commas which are invalid in JSON
             json_content = re.sub(r',\s*([}\]])', r'\1', json_content)
@@ -499,8 +512,23 @@ class AnthropicClient(BaseClient):
             try:
                 pixel_data = json.loads(json_content)
             except json.JSONDecodeError as e:
-                # Try one more repair: Find and complete incomplete objects
+                # Try more aggressive repair
                 logger.warning(f"Initial JSON parsing failed: {e}. Attempting deeper repair.")
+                
+                # Check for and fix truncated rows (helps with larger sprites)
+                # This looks for patterns like [[...],[...],[... and tries to close them
+                if "[[" in json_content and "]," in json_content:
+                    # Find a valid row pattern to use as template
+                    row_pattern = r'\[((?:\[\d+,\d+,\d+,\d+\](?:,|))+)\]'
+                    row_matches = re.findall(row_pattern, json_content)
+                    if row_matches and len(row_matches) > 0:
+                        # Use the structure of valid rows to fix incomplete rows
+                        logger.info("Found valid row pattern, attempting to fix incomplete rows")
+                        # Replace truncated rows
+                        json_content = re.sub(r'\[((?:\[\d+,\d+,\d+,\d+\](?:,|))+),\s*\.\.\.', r'[\1]', json_content)
+                
+                # Replace any remaining "..." with empty content
+                json_content = json_content.replace(",...", "]").replace("...", "")
                 
                 # Complete missing closing brackets/braces
                 open_braces = json_content.count('{')

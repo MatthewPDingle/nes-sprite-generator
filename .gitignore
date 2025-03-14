@@ -1,3 +1,29 @@
-/__pycache__
+# Python cache files
+__pycache__/
+*/__pycache__/
+*/**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Project specific files
 pixel_art_generations.log
 apikeys.txt
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
