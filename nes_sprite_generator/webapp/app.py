@@ -33,14 +33,16 @@ def api_generate():
             version_suffix = f"_{i+1}" if versions > 1 else ""
             output_file = os.path.join(output_dir, f"sprite_{timestamp}{version_suffix}.png")
             
-            # Call the API function
+            # Call the API function with post-processing enabled by default
             result = generate_sprite(
                 prompt=data.get('prompt'),
                 width=int(data.get('width', 16)),
                 height=int(data.get('height', 24)),
                 colors=int(data.get('colors', 32)),
                 model=data.get('model', 'gpt-4o'),
-                output=output_file
+                output=output_file,
+                post_process=True,  # Enable post-processing by default
+                resize_method="bilinear"  # Use bilinear for smoother resizing
             )
             
             if result['success']:

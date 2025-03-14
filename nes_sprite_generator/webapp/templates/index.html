@@ -224,7 +224,7 @@
             </div>
             
             <label for="model">AI Model</label>
-            <select id="model" name="model" style="width: calc(100% - 16px); margin-right: 16px;">
+            <select id="model" name="model" style="width: calc(100% - 32px); margin-right: 16px;">
                 <option value="gpt-4o">GPT-4o</option>
                 <option value="claude-3-7-sonnet-low">Claude 3.7 Sonnet (Low)</option>
                 <!-- Models will be populated from API -->
@@ -331,31 +331,53 @@
                     model: document.getElementById('model').value
                 };
                 
-                // Send to API
-                fetch('/api/generate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Hide loading state
-                    generateBtn.disabled = false;
-                    spinner.style.display = 'none';
+                // Show generation message with versions
+                const versionsCount = formData.versions;
+                statusMessage.textContent = `Generating ${versionsCount > 1 ? versionsCount + ' sprites' : 'sprite'}...`;
+                
+                // Create placeholders for each version
+                const placeholders = [];
+                for (let i = 0; i < versionsCount; i++) {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'sprite-item';
+                    placeholder.innerHTML = `
+                        <div class="spinner" style="display: block; margin: 30px auto;"></div>
+                        <p>Generating version ${i+1}...</p>
+                    `;
+                    gallery.prepend(placeholder);
+                    placeholders.push(placeholder);
+                }
+                
+                // Send request to generate first sprite
+                const generateNextSprite = function(index) {
+                    if (index >= versionsCount) {
+                        // All sprites generated
+                        generateBtn.disabled = false;
+                        spinner.style.display = 'none';
+                        statusMessage.textContent = 'All sprites generated successfully!';
+                        return;
+                    }
                     
-                    if (data.success) {
-                        // Show success message
-                        statusMessage.textContent = 'Sprite generated successfully!';
+                    // Current version data
+                    const versionData = {...formData, versions: 1};
+                    
+                    // API call for single sprite
+                    fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(versionData)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update placeholder with actual sprite
+                        const placeholder = placeholders[index];
+                        placeholder.innerHTML = '';
                         
-                        // Process each image from the response
-                        const images = Array.isArray(data.image_urls) ? data.image_urls : [data.image_url];
-                        
-                        images.forEach((imageUrl, index) => {
-                            // Add to gallery
-                            const spriteItem = document.createElement('div');
-                            spriteItem.className = 'sprite-item';
+                        if (data.success) {
+                            // Get image URL
+                            const imageUrl = Array.isArray(data.image_urls) ? data.image_urls[0] : data.image_url;
                             
                             if (imageUrl) {
                                 // Add image with pixelated rendering
@@ -378,43 +400,43 @@
                                 };
                                 
                                 // Add to DOM
-                                spriteItem.appendChild(img);
-                                spriteItem.appendChild(downloadBtn);
+                                placeholder.appendChild(img);
+                                placeholder.appendChild(downloadBtn);
                             } else {
                                 // Create error message for failed generation
                                 const errorMsg = document.createElement('div');
                                 errorMsg.className = 'generation-error';
                                 errorMsg.textContent = 'Error during generation. Please try again.';
-                                spriteItem.appendChild(errorMsg);
+                                placeholder.appendChild(errorMsg);
                             }
-                            
-                            gallery.prepend(spriteItem);
-                        });
-                    } else {
-                        // Show error
-                        statusMessage.textContent = `Error: ${data.error || 'Unknown error'}`;
-                        statusMessage.classList.add('error-message');
+                        } else {
+                            // Show error
+                            const errorMsg = document.createElement('div');
+                            errorMsg.className = 'generation-error';
+                            errorMsg.textContent = 'Error during generation. Please try again.';
+                            placeholder.appendChild(errorMsg);
+                        }
                         
-                        // Add error placeholder in gallery
-                        const spriteItem = document.createElement('div');
-                        spriteItem.className = 'sprite-item';
+                        // Generate next sprite
+                        generateNextSprite(index + 1);
+                    })
+                    .catch(error => {
+                        // Handle error for this version
+                        const placeholder = placeholders[index];
+                        placeholder.innerHTML = '';
                         
                         const errorMsg = document.createElement('div');
                         errorMsg.className = 'generation-error';
                         errorMsg.textContent = 'Error during generation. Please try again.';
+                        placeholder.appendChild(errorMsg);
                         
-                        spriteItem.appendChild(errorMsg);
-                        gallery.prepend(spriteItem);
-                    }
-                })
-                .catch(error => {
-                    // Handle error
-                    generateBtn.disabled = false;
-                    spinner.style.display = 'none';
-                    statusMessage.textContent = `Error: ${error.message}`;
-                    statusMessage.classList.add('error-message');
-                    console.error('Error:', error);
-                });
+                        // Continue with next sprite
+                        generateNextSprite(index + 1);
+                    });
+                };
+                
+                // Start generating sprites one by one
+                generateNextSprite(0);
             });
         });
     </script>
