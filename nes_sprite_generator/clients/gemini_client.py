@@ -15,6 +15,7 @@ class GeminiClient(BaseClient):
     
     # Define Gemini model constants
     GEMINI_FLASH = "gemini-2.0-flash"
+    GEMINI_FLASH_EXP = "gemini-2.0-flash-exp"
     GEMINI_PRO = "gemini-2.0-pro-exp-02-05"
     GEMINI_FLASH_THINKING = "gemini-2.0-flash-thinking-exp-01-21"
     
