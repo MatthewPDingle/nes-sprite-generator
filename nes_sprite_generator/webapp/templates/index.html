@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NES Sprite Generator</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #202020;
+            color: #e0e0e0;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1, h2 {
+            color: #e0e0e0;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-section {
+            background-color: #303030;
+            border: 4px solid #505050;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            background: #404040;
+            border: 2px solid #606060;
+            color: #e0e0e0;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: #8C8CFF;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            font-size: 1.1rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #6060FF;
+        }
+        
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .sprite-item {
+            background-color: #303030;
+            border: 2px solid #505050;
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+        }
+        
+        .sprite-image {
+            image-rendering: pixelated;
+            width: 100%;
+            height: auto;
+            background-color: #000;
+            border: 1px solid #606060;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #8C8CFF;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status-message {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #303030;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .error-message {
+            background-color: #602020;
+            color: #ffcccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>NES Sprite Generator</h1>
+    <p>Generate 8-bit style pixel art using AI.</p>
+    
+    <div class="form-section">
+        <form id="sprite-form">
+            <label for="prompt">Description</label>
+            <textarea id="prompt" name="prompt" rows="3" required 
+                placeholder="Describe what you want to generate (e.g., 'A warrior with a sword and shield')"></textarea>
+            
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label for="width">Width (pixels)</label>
+                    <input type="number" id="width" name="width" value="16" min="8" max="64">
+                </div>
+                <div style="flex: 1;">
+                    <label for="height">Height (pixels)</label>
+                    <input type="number" id="height" name="height" value="24" min="8" max="64">
+                </div>
+                <div style="flex: 1;">
+                    <label for="colors">Max Colors</label>
+                    <input type="number" id="colors" name="colors" value="32" min="2" max="64">
+                </div>
+            </div>
+            
+            <label for="model">AI Model</label>
+            <select id="model" name="model">
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="claude-3-7-sonnet-low">Claude 3.7 Sonnet (Low)</option>
+                <!-- Models will be populated from API -->
+            </select>
+            
+            <button type="submit" id="generate-btn">Generate Sprite</button>
+        </form>
+    </div>
+    
+    <div id="spinner" class="spinner"></div>
+    <div id="status-message" class="status-message"></div>
+    
+    <h2>Generated Sprites</h2>
+    <div id="gallery" class="gallery">
+        <!-- Generated sprites will appear here -->
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('sprite-form');
+            const generateBtn = document.getElementById('generate-btn');
+            const spinner = document.getElementById('spinner');
+            const statusMessage = document.getElementById('status-message');
+            const gallery = document.getElementById('gallery');
+            const modelSelect = document.getElementById('model');
+            
+            // Fetch available models
+            fetch('/api/models')
+                .then(response => response.json())
+                .then(models => {
+                    // Clear existing options
+                    modelSelect.innerHTML = '';
+                    
+                    // Add models grouped by provider
+                    const providers = {
+                        'gpt': 'OpenAI',
+                        'o3': 'OpenAI',
+                        'claude': 'Anthropic',
+                        'gemini': 'Google'
+                    };
+                    
+                    // Group models by provider
+                    const groupedModels = {};
+                    Object.entries(models).forEach(([id, description]) => {
+                        let provider = 'Other';
+                        for (const [prefix, name] of Object.entries(providers)) {
+                            if (id.startsWith(prefix)) {
+                                provider = name;
+                                break;
+                            }
+                        }
+                        
+                        if (!groupedModels[provider]) {
+                            groupedModels[provider] = [];
+                        }
+                        groupedModels[provider].push({ id, description });
+                    });
+                    
+                    // Add options with optgroups
+                    Object.entries(groupedModels).forEach(([provider, models]) => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = provider;
+                        
+                        models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            option.textContent = `${model.id} - ${model.description}`;
+                            optgroup.appendChild(option);
+                        });
+                        
+                        modelSelect.appendChild(optgroup);
+                    });
+                    
+                    // Default to a reasonable model
+                    if (modelSelect.querySelector('option[value="claude-3-7-sonnet-low"]')) {
+                        modelSelect.value = 'claude-3-7-sonnet-low';
+                    } else if (modelSelect.querySelector('option[value="gpt-4o"]')) {
+                        modelSelect.value = 'gpt-4o';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching models:', error);
+                });
+            
+            // Handle form submission
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Disable form and show loading state
+                generateBtn.disabled = true;
+                spinner.style.display = 'block';
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = 'Generating sprite...';
+                statusMessage.classList.remove('error-message');
+                
+                // Get form data
+                const formData = {
+                    prompt: document.getElementById('prompt').value,
+                    width: parseInt(document.getElementById('width').value),
+                    height: parseInt(document.getElementById('height').value),
+                    colors: parseInt(document.getElementById('colors').value),
+                    model: document.getElementById('model').value
+                };
+                
+                // Send to API
+                fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loading state
+                    generateBtn.disabled = false;
+                    spinner.style.display = 'none';
+                    
+                    if (data.success) {
+                        // Show success message
+                        statusMessage.textContent = 'Sprite generated successfully!';
+                        
+                        // Add to gallery
+                        const spriteItem = document.createElement('div');
+                        spriteItem.className = 'sprite-item';
+                        
+                        // Add image with pixelated rendering
+                        const img = document.createElement('img');
+                        img.src = data.image_url;
+                        img.className = 'sprite-image';
+                        img.alt = formData.prompt;
+                        
+                        // Add details
+                        const details = document.createElement('div');
+                        details.innerHTML = `
+                            <p>${formData.width}x${formData.height}, ${formData.colors} colors</p>
+                            <p>${formData.model}</p>
+                        `;
+                        
+                        // Add to DOM
+                        spriteItem.appendChild(img);
+                        spriteItem.appendChild(details);
+                        gallery.prepend(spriteItem);
+                    } else {
+                        // Show error
+                        statusMessage.textContent = `Error: ${data.error || 'Unknown error'}`;
+                        statusMessage.classList.add('error-message');
+                    }
+                })
+                .catch(error => {
+                    // Handle error
+                    generateBtn.disabled = false;
+                    spinner.style.display = 'none';
+                    statusMessage.textContent = `Error: ${error.message}`;
+                    statusMessage.classList.add('error-message');
+                    console.error('Error:', error);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
