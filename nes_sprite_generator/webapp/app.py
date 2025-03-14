@@ -16,27 +16,44 @@ def index():
 def api_generate():
     data = request.json
     
-    # Generate a unique output filename
+    # Get number of versions
+    versions = int(data.get('versions', 1))
+    
+    # Generate unique output filenames for each version
     timestamp = int(time.time())
     output_dir = os.path.join(app.static_folder, 'generated')
     os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, f"sprite_{timestamp}.png")
+    
+    image_urls = []
+    all_successful = True
+    error_message = None
     
     try:
-        # Call the API function
-        result = generate_sprite(
-            prompt=data.get('prompt'),
-            width=int(data.get('width', 16)),
-            height=int(data.get('height', 24)),
-            colors=int(data.get('colors', 32)),
-            model=data.get('model', 'gpt-4o'),
-            output=output_file
-        )
+        for i in range(versions):
+            version_suffix = f"_{i+1}" if versions > 1 else ""
+            output_file = os.path.join(output_dir, f"sprite_{timestamp}{version_suffix}.png")
+            
+            # Call the API function
+            result = generate_sprite(
+                prompt=data.get('prompt'),
+                width=int(data.get('width', 16)),
+                height=int(data.get('height', 24)),
+                colors=int(data.get('colors', 32)),
+                model=data.get('model', 'gpt-4o'),
+                output=output_file
+            )
+            
+            if result['success']:
+                image_urls.append(f"/static/generated/sprite_{timestamp}{version_suffix}.png")
+            else:
+                all_successful = False
+                error_message = result.get('error', 'Unknown error')
+                image_urls.append(None)  # Add None for failed generation
         
         # Return JSON response
         return jsonify({
-            'success': result['success'],
-            'image_url': f"/static/generated/sprite_{timestamp}.png",
+            'success': True,
+            'image_urls': image_urls,
             'explanation': result['pixel_data'].get('explanation', 'No explanation provided')
         })
     except Exception as e:
