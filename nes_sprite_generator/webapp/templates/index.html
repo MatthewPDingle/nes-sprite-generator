@@ -163,6 +163,16 @@
             border-color: #D82800;
         }
         
+        .generation-error {
+            color: #ff5050;
+            background-color: #300;
+            border: 2px solid #D82800;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+        
         /* NES decoration elements */
         h1 {
             position: relative;
@@ -191,7 +201,7 @@
                 placeholder="Describe what you want to generate (e.g., 'A warrior with a sword and shield')" 
                 style="width: calc(100% - 16px);"></textarea>
             
-            <div style="display: flex; gap: 10px; margin-right: 8px;">
+            <div style="display: flex; gap: 10px; margin-right: 16px;">
                 <div style="flex: 1;">
                     <label for="width">Width (pixels)</label>
                     <input type="number" id="width" name="width" value="16" min="8" max="64">
@@ -203,6 +213,13 @@
                 <div style="flex: 1;">
                     <label for="colors">Max Colors</label>
                     <input type="number" id="colors" name="colors" value="32" min="2" max="64">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-right: 16px;">
+                <div style="flex: 1;">
+                    <label for="versions">Number of Versions</label>
+                    <input type="number" id="versions" name="versions" value="1" min="1" max="10">
                 </div>
             </div>
             
@@ -310,6 +327,7 @@
                     width: parseInt(document.getElementById('width').value),
                     height: parseInt(document.getElementById('height').value),
                     colors: parseInt(document.getElementById('colors').value),
+                    versions: parseInt(document.getElementById('versions').value),
                     model: document.getElementById('model').value
                 };
                 
@@ -331,44 +349,62 @@
                         // Show success message
                         statusMessage.textContent = 'Sprite generated successfully!';
                         
-                        // Add to gallery
-                        const spriteItem = document.createElement('div');
-                        spriteItem.className = 'sprite-item';
+                        // Process each image from the response
+                        const images = Array.isArray(data.image_urls) ? data.image_urls : [data.image_url];
                         
-                        // Add image with pixelated rendering
-                        const img = document.createElement('img');
-                        img.src = data.image_url;
-                        img.className = 'sprite-image';
-                        img.alt = formData.prompt;
-                        
-                        // No detailed text about dimensions/model
-                        
-                        // Add scale notice if image is shown larger than actual size
-                        const scaleNotice = document.createElement('div');
-                        scaleNotice.className = 'scale-notice';
-                        scaleNotice.textContent = `* Displayed larger than actual size`;
-                        
-                        // Add download button
-                        const downloadBtn = document.createElement('button');
-                        downloadBtn.className = 'download-btn';
-                        downloadBtn.textContent = 'DOWNLOAD';
-                        downloadBtn.onclick = function() {
-                            const a = document.createElement('a');
-                            a.href = data.image_url;
-                            a.download = `nes_sprite_${Date.now()}.png`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                        };
-                        
-                        // Add to DOM
-                        spriteItem.appendChild(img);
-                        spriteItem.appendChild(downloadBtn);
-                        gallery.prepend(spriteItem);
+                        images.forEach((imageUrl, index) => {
+                            // Add to gallery
+                            const spriteItem = document.createElement('div');
+                            spriteItem.className = 'sprite-item';
+                            
+                            if (imageUrl) {
+                                // Add image with pixelated rendering
+                                const img = document.createElement('img');
+                                img.src = imageUrl;
+                                img.className = 'sprite-image';
+                                img.alt = formData.prompt;
+                                
+                                // Add download button
+                                const downloadBtn = document.createElement('button');
+                                downloadBtn.className = 'download-btn';
+                                downloadBtn.textContent = 'DOWNLOAD';
+                                downloadBtn.onclick = function() {
+                                    const a = document.createElement('a');
+                                    a.href = imageUrl;
+                                    a.download = `nes_sprite_${Date.now()}_${index+1}.png`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                };
+                                
+                                // Add to DOM
+                                spriteItem.appendChild(img);
+                                spriteItem.appendChild(downloadBtn);
+                            } else {
+                                // Create error message for failed generation
+                                const errorMsg = document.createElement('div');
+                                errorMsg.className = 'generation-error';
+                                errorMsg.textContent = 'Error during generation. Please try again.';
+                                spriteItem.appendChild(errorMsg);
+                            }
+                            
+                            gallery.prepend(spriteItem);
+                        });
                     } else {
                         // Show error
                         statusMessage.textContent = `Error: ${data.error || 'Unknown error'}`;
                         statusMessage.classList.add('error-message');
+                        
+                        // Add error placeholder in gallery
+                        const spriteItem = document.createElement('div');
+                        spriteItem.className = 'sprite-item';
+                        
+                        const errorMsg = document.createElement('div');
+                        errorMsg.className = 'generation-error';
+                        errorMsg.textContent = 'Error during generation. Please try again.';
+                        
+                        spriteItem.appendChild(errorMsg);
+                        gallery.prepend(spriteItem);
                     }
                 })
                 .catch(error => {
