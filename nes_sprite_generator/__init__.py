@@ -57,7 +57,7 @@ AVAILABLE_MODELS = {
     # OpenAI models
     "gpt-4o": "OpenAI GPT-4o model",
     "gpt-4o-mini": "OpenAI GPT-4o-mini model",
-    "gpt-5-preview": "OpenAI GPT-5 Preview model",
+    "gpt-4.5-preview": "OpenAI GPT-4.5 Preview model",
     "o3-mini-low": "OpenAI o3-mini with low reasoning effort",
     "o3-mini-medium": "OpenAI o3-mini with medium reasoning effort",
     "o3-mini-high": "OpenAI o3-mini with high reasoning effort",
