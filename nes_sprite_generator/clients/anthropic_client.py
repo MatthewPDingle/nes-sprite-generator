@@ -287,6 +287,69 @@ class AnthropicClient(BaseClient):
                 text_content += block.get("text", "")
         return text_content
     
+    def generate_pixel_art(self, 
+                         system_prompt: str,
+                         user_prompt: str,
+                         width: int = 16, 
+                         height: int = 16, 
+                         max_colors: int = 16) -> Dict[str, Any]:
+        """
+        Generate pixel art using Anthropic Claude.
+        
+        Args:
+            system_prompt: System prompt with detailed instructions
+            user_prompt: User prompt describing what to generate
+            width: Width of the pixel canvas
+            height: Height of the pixel canvas
+            max_colors: Maximum number of colors to use
+            
+        Returns:
+            Dictionary containing the pixel grid, palette, and explanation
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # Make the API request
+        response = self._make_api_request(messages)
+        response_text = self._extract_text_from_response(response)
+        
+        # Extract JSON from the response
+        try:
+            # First, try to find JSON block in markdown
+            if "```json" in response_text:
+                json_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                json_text = response_text.split("```")[1].split("```")[0].strip()
+            else:
+                # Try to find the JSON object
+                match = re.search(r'(\{.*\})', response_text, re.DOTALL)
+                if match:
+                    json_text = match.group(1)
+                else:
+                    json_text = response_text.strip()
+            
+            # Clean up the JSON text
+            json_text = re.sub(r',\s*([}\]])', r'\1', json_text)  # Remove trailing commas
+            
+            # Parse the JSON
+            pixel_data = json.loads(json_text)
+            
+            # Validate the response
+            if "pixel_grid" not in pixel_data:
+                raise ValueError("Missing pixel_grid in response")
+            if "palette" not in pixel_data:
+                raise ValueError("Missing palette in response")
+            
+            # Return the pixel data
+            return pixel_data
+            
+        except Exception as e:
+            logger.error(f"Failed to parse response from Claude: {e}")
+            logger.error(f"Response text: {response_text[:500]}...")
+            raise RuntimeError(f"Failed to parse pixel art response: {e}")
+    
     def generate_pixel_grid(self, 
                             prompt: str, 
                             width: int = 16, 

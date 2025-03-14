@@ -28,6 +28,100 @@ class OpenAIClient(BaseClient):
         else:
             self.model = model
     
+    def generate_pixel_art(self, 
+                         system_prompt: str,
+                         user_prompt: str,
+                         width: int = 16, 
+                         height: int = 16, 
+                         max_colors: int = 16) -> Dict[str, Any]:
+        """
+        Generate pixel art using OpenAI's function calling.
+        
+        Args:
+            system_prompt: System prompt with detailed instructions
+            user_prompt: User prompt describing what to generate
+            width: Width of the pixel canvas
+            height: Height of the pixel canvas
+            max_colors: Maximum number of colors to use
+            
+        Returns:
+            Dictionary containing the pixel grid, palette, and explanation
+        """
+        # Define the function to call
+        functions = [
+            {
+                "name": "create_pixel_art",
+                "description": "Create a pixel art image based on a description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pixel_grid": {
+                            "type": "array",
+                            "description": f"A {height}x{width} grid where each cell is a hex color string or null for transparency.",
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": ["string", "null"],
+                                    "description": "Hex color string (e.g., '#FF0000') or null for transparency"
+                                },
+                                "minItems": width,
+                                "maxItems": width
+                            },
+                            "minItems": height,
+                            "maxItems": height
+                        },
+                        "palette": {
+                            "type": "array",
+                            "description": f"The color palette used, with a maximum of {max_colors} unique colors.",
+                            "items": {
+                                "type": "string",
+                                "description": "Hex color string (e.g., '#FF0000')"
+                            },
+                            "maxItems": max_colors
+                        },
+                        "explanation": {
+                            "type": "string",
+                            "description": "A very brief explanation (max 150 characters) of key design choices"
+                        }
+                    },
+                    "required": ["pixel_grid", "palette", "explanation"]
+                }
+            }
+        ]
+        
+        # Assemble messages
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # Make the API call
+        try:
+            # Prepare the request parameters
+            request_params = {
+                "model": self.model,
+                "messages": messages,
+                "tools": [{"type": "function", "function": functions[0]}],
+                "tool_choice": {"type": "function", "function": {"name": "create_pixel_art"}}
+            }
+            
+            # Add reasoning_effort if using o3-mini with specific level
+            if self.model == "o3-mini" and self.reasoning_effort in ["low", "medium", "high"]:
+                request_params["reasoning_effort"] = self.reasoning_effort
+                logger.info(f"Using reasoning_effort: {self.reasoning_effort}")
+            
+            response = self.client.chat.completions.create(**request_params)
+            
+            # Extract the function call arguments
+            tool_call = response.choices[0].message.tool_calls[0]
+            function_args = json.loads(tool_call.function.arguments)
+            
+            return function_args
+            
+        except Exception as e:
+            logger.error(f"Failed to generate pixel art: {e}")
+            raise
+    
     def generate_pixel_grid(self, 
                            prompt: str, 
                            width: int = 16, 
@@ -50,54 +144,6 @@ class OpenAIClient(BaseClient):
         # Ensure width and height are valid
         if width <= 0 or height <= 0:
             raise ValueError(f"Invalid dimensions: {width}x{height}. Both width and height must be positive integers.")
-        
-        # Define the function to call
-        functions = [
-            {
-                "name": "create_pixel_art",
-                "description": "Create a pixel art image based on a description",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "pixel_grid": {
-                            "type": "array",
-                            "description": f"A {height}x{width} grid where each cell is an RGBA color. The outer array represents rows (height), and each inner array represents pixels in that row (width).",
-                            "items": {
-                                "type": "array",
-                                "items": {
-                                    "type": "array",
-                                    "description": "RGBA color value where each component is 0-255",
-                                    "items": {"type": "integer", "minimum": 0, "maximum": 255},
-                                    "minItems": 4,
-                                    "maxItems": 4
-                                },
-                                "minItems": width,
-                                "maxItems": width
-                            },
-                            "minItems": height,
-                            "maxItems": height
-                        },
-                        "palette": {
-                            "type": "array",
-                            "description": f"The color palette used, with a maximum of {max_colors} unique colors.",
-                            "items": {
-                                "type": "array",
-                                "description": "RGBA color value",
-                                "items": {"type": "integer", "minimum": 0, "maximum": 255},
-                                "minItems": 4,
-                                "maxItems": 4
-                            },
-                            "maxItems": max_colors
-                        },
-                        "explanation": {
-                            "type": "string",
-                            "description": "A very brief explanation (max 150 characters) of key design choices"
-                        }
-                    },
-                    "required": ["pixel_grid", "palette", "explanation"]
-                }
-            }
-        ]
         
         # Prepare system message
         system_content = f"""You are a master pixel art designer specializing in {style}.
@@ -137,35 +183,10 @@ class OpenAIClient(BaseClient):
         Your goal is to create rich, detailed pixel art that makes maximum use of the limited canvas.
         Don't create tiny sprites with lots of empty space around them."""
         
-        # Assemble messages
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content}
-        ]
-        
-        # Make the API call
-        try:
-            # Prepare the request parameters
-            request_params = {
-                "model": self.model,
-                "messages": messages,
-                "tools": [{"type": "function", "function": functions[0]}],
-                "tool_choice": {"type": "function", "function": {"name": "create_pixel_art"}}
-            }
-            
-            # Add reasoning_effort if using o3-mini with specific level
-            if self.model == "o3-mini" and self.reasoning_effort in ["low", "medium", "high"]:
-                request_params["reasoning_effort"] = self.reasoning_effort
-                logger.info(f"Using reasoning_effort: {self.reasoning_effort}")
-            
-            response = self.client.chat.completions.create(**request_params)
-            
-            # Extract the function call arguments
-            tool_call = response.choices[0].message.tool_calls[0]
-            function_args = json.loads(tool_call.function.arguments)
-            
-            return function_args
-            
-        except Exception as e:
-            logger.error(f"Failed to generate pixel art: {e}")
-            raise
+        return self.generate_pixel_art(
+            system_prompt=system_content,
+            user_prompt=user_content,
+            width=width,
+            height=height,
+            max_colors=max_colors
+        )
