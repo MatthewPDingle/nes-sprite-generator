@@ -50,12 +50,12 @@ class PixelArtGenerator:
         # Call the AI model
         try:
             logger.info(f"Calling {self.model} to generate pixel art of: {prompt}")
-            result = self.client.generate_pixel_art(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
+            result = self.client.generate_pixel_grid(
+                prompt=prompt,
                 width=width,
                 height=height,
-                max_colors=max_colors
+                max_colors=max_colors,
+                style=style
             )
             
             logger.info(f"Successfully generated pixel art response")
