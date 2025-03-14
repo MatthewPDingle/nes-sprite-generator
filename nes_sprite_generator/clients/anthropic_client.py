@@ -333,8 +333,30 @@ class AnthropicClient(BaseClient):
             # Clean up the JSON text
             json_text = re.sub(r',\s*([}\]])', r'\1', json_text)  # Remove trailing commas
             
+            # Replace any truncation markers
+            json_text = re.sub(r'\[\s*\.\.\.\s*\]', '[]', json_text)
+            json_text = re.sub(r'\[\s*etc\.\s*\]', '[]', json_text)
+            
             # Parse the JSON
-            pixel_data = json.loads(json_text)
+            try:
+                pixel_data = json.loads(json_text)
+            except json.JSONDecodeError as e:
+                # Try one more repair: Find and complete incomplete objects
+                logger.warning(f"Initial JSON parsing failed: {e}. Attempting deeper repair.")
+                
+                # Complete missing closing brackets/braces
+                open_braces = json_text.count('{')
+                close_braces = json_text.count('}')
+                if open_braces > close_braces:
+                    json_text += '}' * (open_braces - close_braces)
+                    
+                open_brackets = json_text.count('[')
+                close_brackets = json_text.count(']')
+                if open_brackets > close_brackets:
+                    json_text += ']' * (open_brackets - close_brackets)
+                
+                # Try parsing again
+                pixel_data = json.loads(json_text)
             
             # Validate the response
             if "pixel_grid" not in pixel_data:
