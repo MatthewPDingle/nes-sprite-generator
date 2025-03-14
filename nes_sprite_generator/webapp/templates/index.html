@@ -98,7 +98,7 @@
         
         .sprite-image {
             image-rendering: pixelated;
-            width: 100%;
+            width: 50%;
             height: auto;
             background-color: #000;
             border: 2px solid #444;
@@ -182,15 +182,16 @@
 </head>
 <body>
     <h1>NES Sprite Generator</h1>
-    <p>Generate NES-style pixel art using LLMs</p>
+    <p style="text-align: center;">Generate NES-style pixel art using LLMs</p>
     
     <div class="form-section">
         <form id="sprite-form">
             <label for="prompt">Description</label>
             <textarea id="prompt" name="prompt" rows="3" required 
-                placeholder="Describe what you want to generate (e.g., 'A warrior with a sword and shield')"></textarea>
+                placeholder="Describe what you want to generate (e.g., 'A warrior with a sword and shield')" 
+                style="width: calc(100% - 16px);"></textarea>
             
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 10px; margin-right: 8px;">
                 <div style="flex: 1;">
                     <label for="width">Width (pixels)</label>
                     <input type="number" id="width" name="width" value="16" min="8" max="64">
@@ -206,7 +207,7 @@
             </div>
             
             <label for="model">AI Model</label>
-            <select id="model" name="model">
+            <select id="model" name="model" style="width: calc(100% - 16px);">
                 <option value="gpt-4o">GPT-4o</option>
                 <option value="claude-3-7-sonnet-low">Claude 3.7 Sonnet (Low)</option>
                 <!-- Models will be populated from API -->
@@ -220,6 +221,7 @@
     <div id="status-message" class="status-message"></div>
     
     <h2>Generated Sprites</h2>
+    <div class="scale-notice" style="text-align: center; margin-bottom: 15px;">* Images displayed larger than actual size</div>
     <div id="gallery" class="gallery">
         <!-- Generated sprites will appear here -->
     </div>
@@ -339,12 +341,7 @@
                         img.className = 'sprite-image';
                         img.alt = formData.prompt;
                         
-                        // Add details
-                        const details = document.createElement('div');
-                        details.innerHTML = `
-                            <p>${formData.width}x${formData.height}, ${formData.colors} colors</p>
-                            <p>${formData.model}</p>
-                        `;
+                        // No detailed text about dimensions/model
                         
                         // Add scale notice if image is shown larger than actual size
                         const scaleNotice = document.createElement('div');
@@ -366,8 +363,6 @@
                         
                         // Add to DOM
                         spriteItem.appendChild(img);
-                        spriteItem.appendChild(details);
-                        spriteItem.appendChild(scaleNotice);
                         spriteItem.appendChild(downloadBtn);
                         gallery.prepend(spriteItem);
                     } else {
