@@ -19,6 +19,9 @@ class GeminiClient(BaseClient):
     GEMINI_PRO = "gemini-2.0-pro-exp-02-05"
     GEMINI_FLASH_THINKING = "gemini-2.0-flash-thinking-exp-01-21"
     
+    # Models with image generation capabilities
+    IMAGE_GENERATION_MODELS = [GEMINI_FLASH_EXP]
+    
     def __init__(self, api_key: Optional[str] = None, model: str = GEMINI_FLASH):
         """
         Initialize the Gemini client with credentials.
@@ -59,6 +62,7 @@ class GeminiClient(BaseClient):
         """
         Generate a pixel grid representation using Gemini.
         Uses function calling for standard models, and text-based approach for thinking models.
+        For supported models, can directly generate images.
         
         Args:
             prompt: Description of the pixel art to create
@@ -74,6 +78,11 @@ class GeminiClient(BaseClient):
         if width <= 0 or height <= 0:
             raise ValueError(f"Invalid dimensions: {width}x{height}. Both width and height must be positive integers.")
         
+        # Check if this is a model with direct image generation capability
+        if self.model in self.IMAGE_GENERATION_MODELS:
+            logger.info(f"Using direct image generation with model: {self.model}")
+            return self._generate_with_image_generation(prompt, width, height, max_colors, style)
+        
         # Check if we're using a thinking model
         is_thinking_model = "thinking" in self.model.lower()
         
@@ -82,6 +91,91 @@ class GeminiClient(BaseClient):
             return self._generate_with_text_based_approach(prompt, width, height, max_colors, style)
         else:
             # Function calling approach for standard models
+            return self._generate_with_function_calling(prompt, width, height, max_colors, style)
+            
+    def _generate_with_image_generation(self, prompt: str, width: int, height: int, 
+                                       max_colors: int, style: str) -> Dict[str, Any]:
+        """
+        Generate pixel art by directly requesting an image from Gemini.
+        Only available with supported models.
+        
+        Args:
+            prompt: Description of the pixel art to create
+            width: Width of the pixel canvas
+            height: Height of the pixel canvas
+            max_colors: Maximum number of colors to use
+            style: Style guide for the pixel art
+            
+        Returns:
+            Dictionary containing the pixel grid, palette, and explanation
+        """
+        from ..image_utils import process_raw_image, image_to_pixel_grid
+        import base64
+        
+        # Prepare the prompt for image generation
+        image_prompt = f"""Generate an NES-style pixel art of: {prompt}
+        
+        IMPORTANT REQUIREMENTS:
+        1. The image MUST be pixel art in NES style.
+        2. Center the subject on a pure white background.
+        3. Make the subject LARGE and clear.
+        4. Use rich colors and subtle gradients to create depth and texture.
+        5. Add highlights and shadows to give dimension.
+        6. Include small details that make the pixel art feel complete and refined.
+        
+        The subject should be the clear focus, centered on a pure white background.
+        """
+        
+        logger.info(f"Generating image with {self.model} for prompt: {prompt}")
+        
+        try:
+            # Make the API call with the response_modalities parameter set to ["IMAGE"]
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "user", "content": image_prompt}
+                ],
+                # Specify we want an image response
+                config={
+                    "response_modalities": ["IMAGE"],
+                    "safety_settings": {"HARM_CATEGORY_VISUAL": "BLOCK_ONLY_HIGH"}
+                }
+            )
+            
+            # Check if we have an image in the response
+            if not hasattr(response, 'images') or not response.images:
+                raise ValueError("No image was returned by the Gemini model")
+            
+            # Get the first image
+            image_data = response.images[0].image_data
+            
+            logger.info(f"Received image from {self.model}, processing...")
+            
+            # Process the image according to our NES sprite workflow
+            processed_image = process_raw_image(
+                image_data=image_data,
+                target_width=width,
+                target_height=height,
+                max_colors=max_colors,
+                white_tolerance=10,  # Adjust tolerance for background removal if needed
+                save_steps=True,
+                output_prefix=f"gemini_{self.model}_prompt_{prompt[:20].replace(' ', '_')}"
+            )
+            
+            # Convert the processed image to a pixel grid and palette
+            pixel_grid, palette = image_to_pixel_grid(processed_image)
+            
+            # Return in the same format as the other generation methods
+            return {
+                "pixel_grid": pixel_grid,
+                "palette": palette,
+                "explanation": f"NES-style pixel art of {prompt} generated with {self.model}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating image with {self.model}: {e}")
+            # If image generation fails, fall back to the standard approach
+            logger.warning(f"Falling back to function calling approach")
             return self._generate_with_function_calling(prompt, width, height, max_colors, style)
             
     def _generate_with_function_calling(self, prompt, width, height, max_colors, style):

@@ -1,10 +1,15 @@
 # NES Sprite Generator - Command Reference
 
-## Command Examples
-- Generate single sprite: `python -m nes_sprite_generator single "character description" --width 16 --height 24 --colors 32 --model "claude-3-7-sonnet-low"`
-- Create multiple versions: `python -m nes_sprite_generator single "your prompt" --versions 3 --post-process --resize-method bilinear`
+## Run Commands
+- CLI: `python -m nes_sprite_generator single "character description" --width 16 --height 24 --colors 32 --model "claude-3-7-sonnet-low"`
+- Multiple sprites: `python -m nes_sprite_generator single "prompt" --versions 3 --post-process --resize-method bilinear`
 - List models: `python -m nes_sprite_generator models`
-- Alternative CLI: `python run.py single "prompt" --width 16 --height 24 --colors 32 --model "model-name"`
+- Alternative CLI: `python run.py single "prompt" --width 16 --height 24 --colors 32`
+- Web interface: `python run_webapp.py` (access at http://localhost:5000)
+
+## Development
+- Install: `pip install -e .` (editable mode)
+- Environment setup: Create a `.env` file with API keys for OpenAI, Anthropic, and/or Google
 
 ## Code Style Guidelines
 - **Imports**: Standard lib → Third-party → Local imports, grouped and sorted

@@ -74,6 +74,10 @@ models = list_available_models()
 - Anthropic: Claude 3.7 Sonnet, Claude 3 Opus
 - Google: Gemini Pro, Gemini Flash
 
+### Special Models
+
+- **gemini-2.0-flash-exp**: Uses direct image generation capabilities instead of pixel grid generation, resulting in higher quality sprites. The generated image undergoes a specialized post-processing pipeline to create true NES-style sprites.
+
 ## Requirements
 
 - Python 3.8+
