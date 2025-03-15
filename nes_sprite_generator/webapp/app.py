@@ -82,8 +82,8 @@ def api_generate():
 
 @app.route('/api/models')
 def api_models():
-    models = list_available_models()
-    return jsonify(models)
+    from .. import AVAILABLE_MODELS
+    return jsonify(AVAILABLE_MODELS)
 
 @app.route('/api/generate-spritesheet', methods=['POST'])
 def api_generate_spritesheet():
