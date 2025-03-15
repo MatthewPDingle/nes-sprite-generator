@@ -348,8 +348,19 @@ def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: i
     
     logger.info(f"Clustering {len(lab_values)} non-transparent pixels in LAB color space")
     
-    # Perform k-means clustering in LAB space with controlled parallelism
-    kmeans = KMeans(n_clusters=max_colors, random_state=42, n_init=10, n_jobs=1)
+    # Perform k-means clustering in LAB space
+    try:
+        # Try with n_jobs parameter (newer scikit-learn versions)
+        kmeans = KMeans(n_clusters=max_colors, random_state=42, n_init=10, n_jobs=1)
+    except TypeError:
+        # Fall back to older scikit-learn versions without n_jobs
+        kmeans = KMeans(n_clusters=max_colors, random_state=42, n_init=10)
+    
+    # Import threading module to set environment variable
+    import os
+    # Limit OpenMP threads to avoid warnings
+    os.environ["OMP_NUM_THREADS"] = "1"
+    
     kmeans.fit(lab_values)
     
     # Get cluster centers and convert back to RGB
