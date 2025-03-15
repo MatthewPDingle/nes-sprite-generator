@@ -397,13 +397,13 @@ def create_sprite_sheet(poses, output_dir, timestamp, debug_dir):
     while rows * cols < len(pose_images):
         cols += 1
     
-    # Get the maximum dimensions
-    max_width = max(img.width for img in pose_images)
-    max_height = max(img.height for img in pose_images)
+    # Use the actual dimensions of each image rather than scaling
+    image_width = pose_images[0].width if pose_images else 16
+    image_height = pose_images[0].height if pose_images else 24
     
-    # Create the sprite sheet canvas
-    sheet_width = cols * max_width
-    sheet_height = rows * max_height
+    # Create the sprite sheet canvas with enough space for all poses at original resolution
+    sheet_width = cols * image_width
+    sheet_height = rows * image_height
     
     # Create with transparent background
     sprite_sheet = Image.new('RGBA', (sheet_width, sheet_height), (0, 0, 0, 0))
@@ -413,9 +413,9 @@ def create_sprite_sheet(poses, output_dir, timestamp, debug_dir):
         row = i // cols
         col = i % cols
         
-        # Calculate position (centered in the cell)
-        x = col * max_width + (max_width - img.width) // 2
-        y = row * max_height + (max_height - img.height) // 2
+        # Position at exact grid location without centering
+        x = col * image_width
+        y = row * image_height
         
         # Paste the image onto the sprite sheet
         sprite_sheet.paste(img, (x, y), img)
