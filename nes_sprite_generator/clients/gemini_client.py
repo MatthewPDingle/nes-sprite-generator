@@ -169,8 +169,9 @@ class GeminiClient(BaseClient):
             # Use the native Google client with the correct parameters based on documentation
             try:
                 # Create the configuration for image generation
+                # Using both Text and Image modalities as per the example Sergey found
                 config = GenerateContentConfig(
-                    response_modalities=["IMAGE"],
+                    response_modalities=["Text", "Image"],
                     temperature=0.7
                 )
                 
@@ -184,9 +185,13 @@ class GeminiClient(BaseClient):
                 
                 logger.info(f"Using model name: {model_name}")
                 
+                # Explicitly ask for an image in the prompt
+                content_prompt = f"Generate an image of: {image_prompt}"
+                logger.info(f"Using content prompt: {content_prompt}")
+                
                 response = self.google_client.models.generate_content(
                     model=model_name,
-                    contents=image_prompt,  # Direct content without "Generate an image of" prefix
+                    contents=content_prompt,
                     config=config
                 )
                 
@@ -196,30 +201,63 @@ class GeminiClient(BaseClient):
                 # Extract image data from the response according to the correct structure
                 image_data = None
                 
-                # Check the candidates structure (based on your example)
-                if hasattr(response, 'candidates') and response.candidates:
-                    candidate = response.candidates[0]
-                    logger.info(f"Found candidate: {dir(candidate)}")
+                try:
+                    # Use the exact structure from Sergey's example
+                    logger.info(f"Response type: {type(response)}")
                     
-                    if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                        logger.info(f"Examining content parts: {len(candidate.content.parts)} parts found")
+                    # Loop through the candidates and parts
+                    for candidate in response.candidates:
+                        logger.info(f"Examining candidate: {type(candidate)}")
                         
-                        for i, part in enumerate(candidate.content.parts):
-                            logger.info(f"Part {i} type: {type(part)} - {dir(part)}")
+                        # Print all candidate attributes for debugging
+                        if hasattr(candidate, '__dict__'):
+                            logger.info(f"Candidate attributes: {candidate.__dict__}")
+                        
+                        if not hasattr(candidate, 'content'):
+                            logger.info("Candidate does not have content attribute")
+                            continue
                             
-                            # Check for inline_data (as in your example)
+                        logger.info(f"Content type: {type(candidate.content)}")
+                        
+                        if not hasattr(candidate.content, 'parts'):
+                            logger.info("Content does not have parts attribute")
+                            continue
+                            
+                        logger.info(f"Found {len(candidate.content.parts)} parts")
+                        
+                        # Examine each part
+                        for i, part in enumerate(candidate.content.parts):
+                            logger.info(f"Examining part {i}: {type(part)}")
+                            
+                            # Print part attributes
+                            if hasattr(part, '__dict__'):
+                                logger.info(f"Part {i} attributes: {part.__dict__}")
+                            
+                            # Extract text if available (for debugging)
+                            if hasattr(part, 'text') and part.text is not None:
+                                logger.info(f"Part {i} text: {part.text[:100]}...")
+                            
+                            # Look for inline_data (primary method from example)
                             if hasattr(part, 'inline_data') and part.inline_data is not None:
-                                logger.info("Found inline_data in part")
+                                logger.info(f"Found inline_data in part {i}")
+                                
+                                # Debug inline_data
+                                if hasattr(part.inline_data, '__dict__'):
+                                    logger.info(f"inline_data attributes: {part.inline_data.__dict__}")
+                                
                                 if hasattr(part.inline_data, 'data'):
                                     image_data = part.inline_data.data
-                                    logger.info("Successfully extracted image data from inline_data")
+                                    logger.info(f"Successfully extracted image data from part {i}")
                                     break
-                            
-                            # Alternative approach - directly check for image_data attribute
-                            if hasattr(part, 'image_data') and part.image_data is not None:
-                                image_data = part.image_data
-                                logger.info("Successfully extracted image data from image_data attribute")
-                                break
+                                else:
+                                    logger.info("inline_data does not have a data attribute")
+                                    
+                        # Break if we found an image
+                        if image_data:
+                            break
+                except Exception as e:
+                    logger.error(f"Error extracting image data: {e}")
+                    # Continue with our extraction attempt
                 
                 if not image_data:
                     logger.warning("No image data found in response structure")
