@@ -377,7 +377,8 @@ class AnthropicClient(BaseClient):
                             width: int = 16, 
                             height: int = 16, 
                             max_colors: int = 16,
-                            style: str = "2D pixel art") -> Dict[str, Any]:
+                            style: str = "2D pixel art",
+                            reference_image = None) -> Dict[str, Any]:
         """
         Generate a pixel grid representation using Anthropic.
         
@@ -387,6 +388,7 @@ class AnthropicClient(BaseClient):
             height: Height of the pixel canvas.
             max_colors: Maximum number of unique colors to use.
             style: Style guide for the pixel art.
+            reference_image: Optional PIL Image object to use as reference (currently not used by Anthropic client)
             
         Returns:
             Dictionary containing the pixel grid, palette, and metadata.
