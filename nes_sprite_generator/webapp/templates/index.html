@@ -193,6 +193,9 @@
 <body>
     <h1>NES Sprite Generator</h1>
     <p style="text-align: center;">Generate NES-style pixel art using LLMs</p>
+    <p style="text-align: center;">
+        <a href="/spritesheet" style="color: #00AA00; text-decoration: none; font-size: 0.8em;">Create Sprite Sheets →</a>
+    </p>
     
     <div class="form-section">
         <form id="sprite-form">
@@ -407,7 +410,7 @@
                                 spriteSheetBtn.className = 'download-btn';
                                 spriteSheetBtn.style.marginTop = '5px';
                                 spriteSheetBtn.style.backgroundColor = '#007000';
-                                spriteSheetBtn.textContent = 'GENERATE SPRITE SHEET';
+                                spriteSheetBtn.textContent = 'GEN. SPRITE SHEET';
                                 spriteSheetBtn.onclick = function() {
                                     const description = document.getElementById('prompt').value;
                                     window.location.href = `/spritesheet?image=${encodeURIComponent(imageUrl)}&description=${encodeURIComponent(description)}`;
