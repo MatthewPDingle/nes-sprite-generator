@@ -225,8 +225,9 @@
             
             <label for="model">AI Model</label>
             <select id="model" name="model" style="width: calc(100% + 4px); margin-right: 16px;">
-                <option value="gpt-4o">GPT-4o</option>
+                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp (Default)</option>
                 <option value="claude-3-7-sonnet-low">Claude 3.7 Sonnet (Low)</option>
+                <option value="gpt-4o">GPT-4o</option>
                 <!-- Models will be populated from API -->
             </select>
             
@@ -299,8 +300,10 @@
                         modelSelect.appendChild(optgroup);
                     });
                     
-                    // Default to a reasonable model
-                    if (modelSelect.querySelector('option[value="claude-3-7-sonnet-low"]')) {
+                    // Default to gemini-2.0-flash-exp
+                    if (modelSelect.querySelector('option[value="gemini-2.0-flash-exp"]')) {
+                        modelSelect.value = 'gemini-2.0-flash-exp';
+                    } else if (modelSelect.querySelector('option[value="claude-3-7-sonnet-low"]')) {
                         modelSelect.value = 'claude-3-7-sonnet-low';
                     } else if (modelSelect.querySelector('option[value="gpt-4o"]')) {
                         modelSelect.value = 'gpt-4o';

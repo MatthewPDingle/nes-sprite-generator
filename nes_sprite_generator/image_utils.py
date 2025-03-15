@@ -321,8 +321,11 @@ def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: i
             if processed_pixels[x, y][3] > 0:  # Not transparent
                 visible_mask.putpixel((x, y), 255)
     
-    # Prepare a new RGB image with non-transparent parts
-    rgb_image = Image.new("RGB", processed_image.size, (0, 0, 0))
+    # Use gray background instead of black to prevent black influence
+    # This will create an RGB image but ensure black isn't introduced in transparent areas
+    rgb_image = Image.new("RGB", processed_image.size, (128, 128, 128))
+    
+    # Copy only non-transparent pixels from the processed image
     for y in range(height):
         for x in range(width):
             if processed_pixels[x, y][3] > 0:  # Not transparent

@@ -39,7 +39,7 @@ def api_generate():
                 width=int(data.get('width', 16)),
                 height=int(data.get('height', 24)),
                 colors=int(data.get('colors', 32)),
-                model=data.get('model', 'gpt-4o'),
+                model=data.get('model', 'gemini-2.0-flash-exp'),
                 output=output_file,
                 post_process=True,  # Enable post-processing by default
                 resize_method="bilinear"  # Use bilinear for smoother resizing
