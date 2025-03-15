@@ -151,19 +151,17 @@ class GeminiClient(BaseClient):
             logger.warning("Native Google Gemini client not available. Falling back to function calling approach")
             return self._generate_with_function_calling(prompt, width, height, max_colors, style)
         
-        # Prepare the prompt for image generation
-        image_prompt = f"""Generate an NES-style pixel art of: {prompt}
+        # Prepare the prompt for image generation - simplified to match your example
+        image_prompt = f"""Create a detailed NES-style pixel art of {prompt}.
         
-        IMPORTANT REQUIREMENTS:
-        1. The image MUST be pixel art in NES style.
-        2. Center the subject on a pure white background.
-        3. Make the subject LARGE and clear.
-        4. Use rich colors and subtle gradients to create depth and texture.
-        5. Add highlights and shadows to give dimension.
-        6. Include small details that make the pixel art feel complete and refined.
+        Make it with:
+        - Classic NES pixel art style
+        - The subject centered on a pure white background
+        - The subject large and clear (filling most of the canvas)
+        - Rich colors, highlights and shadows
+        - Small details for refined appearance
         
-        The subject should be the clear focus, centered on a pure white background.
-        """
+        The image must have the subject centered on a completely white background."""
         
         logger.info(f"Generating image with {self.model} using native Google client")
         
@@ -176,22 +174,57 @@ class GeminiClient(BaseClient):
                     temperature=0.7
                 )
                 
-                # Make the API call
+                # Make the API call - directly matching your example
+                model_name = self.model
+                
+                # If the model doesn't start with "models/", prefix it
+                # The API might expect the "models/" prefix
+                if not model_name.startswith("models/"):
+                    model_name = f"models/{model_name}"
+                
+                logger.info(f"Using model name: {model_name}")
+                
                 response = self.google_client.models.generate_content(
-                    model=self.model,
-                    contents=f"Generate an image of {image_prompt}",
+                    model=model_name,
+                    contents=image_prompt,  # Direct content without "Generate an image of" prefix
                     config=config
                 )
                 
                 logger.info("Successfully received response from Gemini image generation API")
+                logger.info(f"Response structure: {dir(response)}")
                 
-                # Check if we have images in the response
-                if not hasattr(response, 'images') or not response.images:
-                    logger.warning("No images found in response")
+                # Extract image data from the response according to the correct structure
+                image_data = None
+                
+                # Check the candidates structure (based on your example)
+                if hasattr(response, 'candidates') and response.candidates:
+                    candidate = response.candidates[0]
+                    logger.info(f"Found candidate: {dir(candidate)}")
+                    
+                    if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                        logger.info(f"Examining content parts: {len(candidate.content.parts)} parts found")
+                        
+                        for i, part in enumerate(candidate.content.parts):
+                            logger.info(f"Part {i} type: {type(part)} - {dir(part)}")
+                            
+                            # Check for inline_data (as in your example)
+                            if hasattr(part, 'inline_data') and part.inline_data is not None:
+                                logger.info("Found inline_data in part")
+                                if hasattr(part.inline_data, 'data'):
+                                    image_data = part.inline_data.data
+                                    logger.info("Successfully extracted image data from inline_data")
+                                    break
+                            
+                            # Alternative approach - directly check for image_data attribute
+                            if hasattr(part, 'image_data') and part.image_data is not None:
+                                image_data = part.image_data
+                                logger.info("Successfully extracted image data from image_data attribute")
+                                break
+                
+                if not image_data:
+                    logger.warning("No image data found in response structure")
                     return self._generate_with_function_calling(prompt, width, height, max_colors, style)
                 
-                # Get the image data
-                image_data = response.images[0].image_data
                 logger.info("Successfully extracted image data from response")
                 
             except Exception as e:
