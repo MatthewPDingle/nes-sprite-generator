@@ -47,7 +47,8 @@ class PixelArtGenerator:
         logger.info(f"PixelArtGenerator initialized with model: {model}")
         
     def generate_pixel_grid(self, prompt: str, width: int = 16, height: int = 16, 
-                           max_colors: int = 16, style: str = "2D pixel art") -> Dict[str, Any]:
+                           max_colors: int = 16, style: str = "2D pixel art", 
+                           reference_image: Optional[Any] = None) -> Dict[str, Any]:
         """
         Generate a pixel art grid based on the prompt.
         
@@ -57,19 +58,26 @@ class PixelArtGenerator:
             height: Height of the pixel grid
             max_colors: Maximum number of colors to use
             style: Style guide for the pixel art
+            reference_image: Optional reference image (PIL Image object) to guide the generation
             
         Returns:
             Dictionary containing the pixel grid and palette
         """
         # Call the AI model through client - it will handle appropriate prompting
         try:
-            logger.info(f"Calling {self.model} to generate pixel art of: {prompt}")
+            # Log whether we're using a reference image
+            if reference_image:
+                logger.info(f"Calling {self.model} to generate pixel art of: {prompt} with reference image")
+            else:
+                logger.info(f"Calling {self.model} to generate pixel art of: {prompt}")
+                
             result = self.client.generate_pixel_grid(
                 prompt=prompt,
                 width=width,
                 height=height,
                 max_colors=max_colors,
-                style=style
+                style=style,
+                reference_image=reference_image
             )
             
             # Verify we have required fields
@@ -124,7 +132,7 @@ class PixelArtGenerator:
     def process_image(self, pixel_data: Dict[str, Any], output_file: str, 
                      post_process: bool = True, target_width: Optional[int] = None, 
                      target_height: Optional[int] = None, resize_method: str = "nearest",
-                     max_colors: Optional[int] = None, scale: int = 1) -> Dict[str, Any]:
+                     max_colors: Optional[int] = None, scale: int = 1, save_debug: bool = True) -> Dict[str, Any]:
         """
         Process the pixel data and save it as an image.
         
@@ -137,6 +145,7 @@ class PixelArtGenerator:
             resize_method: Method to use for resizing ("nearest", "bilinear", etc.)
             max_colors: Maximum number of colors (for palette optimization)
             scale: Scale factor for the output image (1=actual size, 8=8x for visibility)
+            save_debug: Whether to save intermediate images for debugging
             
         Returns:
             Dictionary with information about the saved image
@@ -193,7 +202,8 @@ class PixelArtGenerator:
         image_width = grid_width * scale
         image_height = grid_height * scale
         
-        return {
+        # Create result object
+        result = {
             "output": output_file,
             "dimensions": (grid_width, grid_height),
             "original_dimensions": (orig_width, orig_height),
@@ -201,6 +211,33 @@ class PixelArtGenerator:
             "colors": len(palette),
             "scale": scale
         }
+        
+        # Add debug images if requested
+        if save_debug:
+            from ..image_utils import process_raw_image
+            import tempfile
+            from PIL import Image
+            
+            try:
+                # Save the final image with intermediate processing steps
+                debug_images = {}
+                
+                # Original rendered grid without post-processing
+                original_grid = render_pixel_grid(pixel_data["pixel_grid"], palette, scale=1)
+                debug_images["original"] = original_grid
+                
+                # Post-processed grid
+                if post_process:
+                    post_processed = img.copy()
+                    debug_images["post_processed"] = post_processed
+                
+                # Add debug images to the result
+                result["debug_images"] = debug_images
+                
+            except Exception as e:
+                logger.error(f"Error saving debug images: {e}")
+        
+        return result
     
     def _get_system_prompt(self, width: int, height: int, max_colors: int, style: str) -> str:
         """

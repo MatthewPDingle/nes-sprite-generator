@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NES Sprite Sheet Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            background-color: #000;
+            color: #fff;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: linear-gradient(to bottom, #000 0%, #000 90%, #005800 100%);
+            min-height: 100vh;
+        }
+        
+        h1, h2 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            text-shadow: 2px 2px 0 #880000;
+        }
+        
+        .form-section {
+            background-color: #212121;
+            border: 4px solid #FF8800;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 0;
+            box-shadow: 5px 5px 0 #000;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #FF8800;
+            font-size: 0.8rem;
+            letter-spacing: -1px;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            background: #000;
+            border: 2px solid #444;
+            color: #fff;
+            border-radius: 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        button {
+            background-color: #D82800;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            font-size: 0.9rem;
+            border-radius: 0;
+            transition: background-color 0.2s;
+            box-shadow: 3px 3px 0 #000;
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+        }
+        
+        button:hover {
+            background-color: #FF3800;
+        }
+        
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        
+        .pose-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .pose-checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .pose-checkbox input {
+            width: auto;
+            margin-right: 5px;
+            margin-bottom: 0;
+        }
+        
+        .pose-checkbox label {
+            display: inline;
+            font-size: 0.7rem;
+        }
+        
+        .reference-sprite {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-direction: column;
+        }
+        
+        .reference-sprite img {
+            image-rendering: pixelated;
+            max-width: 200px;
+            margin-bottom: 10px;
+            background-color: #000;
+            border: 2px solid #444;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 0;
+            border-top: 4px solid #FF8800;
+            border-left: 4px solid #FF8800;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s steps(8) infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status-message {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #000;
+            border: 2px solid #007000;
+            border-radius: 0;
+            display: none;
+            font-size: 0.8rem;
+            box-shadow: 3px 3px 0 #000;
+        }
+        
+        .error-message {
+            background-color: #000;
+            color: #ff5050;
+            border-color: #D82800;
+        }
+        
+        .progress-section {
+            margin-top: 30px;
+        }
+        
+        .progress-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .progress-item {
+            background: #000;
+            border: 2px solid #444;
+            padding: 10px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .progress-item img {
+            image-rendering: pixelated;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .sprite-sheet-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            background-color: #212121;
+            border: 4px solid #00AA00;
+            padding: 20px;
+            border-radius: 0;
+            box-shadow: 5px 5px 0 #000;
+            text-align: center;
+        }
+        
+        .sprite-sheet-container img {
+            image-rendering: pixelated;
+            max-width: 100%;
+            background-color: #000;
+            border: 2px solid #444;
+            margin-bottom: 15px;
+        }
+        
+        .download-btn {
+            margin-top: 10px;
+            background-color: #0070EC;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.7rem;
+            border-radius: 0;
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            box-shadow: 2px 2px 0 #000;
+            max-width: 200px;
+        }
+        
+        .download-btn:hover {
+            background-color: #0090FF;
+        }
+        
+        /* Logo and navigation */
+        .home-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #FF8800;
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .home-link:hover {
+            color: #FFAA00;
+            text-decoration: underline;
+        }
+        
+        .file-upload {
+            margin-bottom: 20px;
+        }
+        
+        .file-upload label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .file-upload input[type="file"] {
+            width: 100%;
+            padding: 5px;
+            border: 2px solid #444;
+            background: #000;
+            color: #fff;
+        }
+        
+        .or-divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .or-divider:before, .or-divider:after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: #444;
+        }
+        
+        .or-divider:before {
+            left: 0;
+        }
+        
+        .or-divider:after {
+            right: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>NES Sprite Sheet Generator</h1>
+    <p style="text-align: center;">Create sprite sheets with character poses</p>
+    <div style="text-align: center;">
+        <a href="/" class="home-link">← Back to Sprite Generator</a>
+    </div>
+    
+    <div class="form-section">
+        <form id="sprite-sheet-form">
+            <div class="file-upload">
+                <label for="sprite-upload">Upload Sprite Image</label>
+                <input type="file" id="sprite-upload" name="sprite-upload" accept="image/png,image/jpeg">
+            </div>
+            
+            <div class="or-divider">OR</div>
+            
+            <div id="reference-sprites-container" style="display: none;">
+                <h3 style="text-align: center; margin-bottom: 15px;">Reference Sprite</h3>
+                <div id="reference-sprite" class="reference-sprite">
+                    <!-- Reference sprite will appear here -->
+                </div>
+            </div>
+            
+            <label for="description">Character Description</label>
+            <textarea id="description" name="description" rows="3" placeholder="Describe the character (e.g., 'A warrior with a sword and shield')" style="width: calc(100% - 16px);"></textarea>
+            
+            <h3 style="margin-top: 20px; margin-bottom: 10px;">Pose Selection</h3>
+            <div class="pose-selection" id="pose-selection">
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-1" name="poses" value="Standing Frontal View" checked>
+                    <label for="pose-1">Standing Frontal</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-2" name="poses" value="Standing Back View" checked>
+                    <label for="pose-2">Standing Back</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-3" name="poses" value="Standing Left View" checked>
+                    <label for="pose-3">Standing Left</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-4" name="poses" value="Standing Right View" checked>
+                    <label for="pose-4">Standing Right</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-5" name="poses" value="Walking Frontal View" checked>
+                    <label for="pose-5">Walking Frontal</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-6" name="poses" value="Walking Back View" checked>
+                    <label for="pose-6">Walking Back</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-7" name="poses" value="Walking Left View" checked>
+                    <label for="pose-7">Walking Left</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-8" name="poses" value="Walking Right View" checked>
+                    <label for="pose-8">Walking Right</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-9" name="poses" value="Running Left View" checked>
+                    <label for="pose-9">Running Left</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-10" name="poses" value="Running Right View" checked>
+                    <label for="pose-10">Running Right</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-11" name="poses" value="Jumping Frontal View" checked>
+                    <label for="pose-11">Jumping Frontal</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-12" name="poses" value="Jumping Back View" checked>
+                    <label for="pose-12">Jumping Back</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-13" name="poses" value="Jumping Left View" checked>
+                    <label for="pose-13">Jumping Left</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-14" name="poses" value="Jumping Right View" checked>
+                    <label for="pose-14">Jumping Right</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-15" name="poses" value="Crouching Frontal View" checked>
+                    <label for="pose-15">Crouching Frontal</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-16" name="poses" value="Crouching Back View" checked>
+                    <label for="pose-16">Crouching Back</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-17" name="poses" value="Crouching Left View" checked>
+                    <label for="pose-17">Crouching Left</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-18" name="poses" value="Crouching Right View" checked>
+                    <label for="pose-18">Crouching Right</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-19" name="poses" value="Attacking Pose" checked>
+                    <label for="pose-19">Attacking</label>
+                </div>
+                <div class="pose-checkbox">
+                    <input type="checkbox" id="pose-20" name="poses" value="Victory Pose" checked>
+                    <label for="pose-20">Victory</label>
+                </div>
+            </div>
+            
+            <button type="submit" id="generate-btn">Generate Sprite Sheet</button>
+        </form>
+    </div>
+    
+    <div id="spinner" class="spinner"></div>
+    <div id="status-message" class="status-message"></div>
+    
+    <div id="progress-section" class="progress-section" style="display: none;">
+        <h2>Generation Progress</h2>
+        <div id="progress-items" class="progress-items">
+            <!-- Progress items will appear here -->
+        </div>
+    </div>
+    
+    <div id="sprite-sheet-container" class="sprite-sheet-container" style="display: none;">
+        <h2>Final Sprite Sheet</h2>
+        <img id="sprite-sheet-image" src="" alt="Sprite Sheet">
+        <button id="download-sprite-sheet" class="download-btn">DOWNLOAD SPRITE SHEET</button>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('sprite-sheet-form');
+            const generateBtn = document.getElementById('generate-btn');
+            const spinner = document.getElementById('spinner');
+            const statusMessage = document.getElementById('status-message');
+            const progressSection = document.getElementById('progress-section');
+            const progressItems = document.getElementById('progress-items');
+            const spriteSheetContainer = document.getElementById('sprite-sheet-container');
+            const spriteSheetImage = document.getElementById('sprite-sheet-image');
+            const downloadSpriteSheetBtn = document.getElementById('download-sprite-sheet');
+            const referenceSpritesContainer = document.getElementById('reference-sprites-container');
+            const referenceSprite = document.getElementById('reference-sprite');
+            const descriptionInput = document.getElementById('description');
+            const spriteUpload = document.getElementById('sprite-upload');
+            
+            // Check URL parameters for reference sprite
+            const urlParams = new URLSearchParams(window.location.search);
+            const refImageUrl = urlParams.get('image');
+            const refDescription = urlParams.get('description');
+            
+            // If we have a reference image from URL params
+            if (refImageUrl) {
+                // Display the reference image
+                referenceSpritesContainer.style.display = 'block';
+                
+                // Create image element
+                const img = document.createElement('img');
+                img.src = refImageUrl;
+                img.alt = 'Reference Sprite';
+                img.dataset.url = refImageUrl;
+                
+                // Create label with description if available
+                const label = document.createElement('p');
+                if (refDescription) {
+                    label.textContent = refDescription;
+                    descriptionInput.value = refDescription;
+                } else {
+                    label.textContent = 'Reference Sprite';
+                }
+                
+                // Add to container
+                referenceSprite.innerHTML = '';
+                referenceSprite.appendChild(img);
+                referenceSprite.appendChild(label);
+            }
+            
+            // Handle form submission
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Validate inputs
+                const description = descriptionInput.value.trim();
+                if (!description && !refImageUrl && !spriteUpload.files.length) {
+                    statusMessage.textContent = 'Please provide a description or upload an image';
+                    statusMessage.style.display = 'block';
+                    statusMessage.classList.add('error-message');
+                    return;
+                }
+                
+                // Get selected poses
+                const selectedPoses = [];
+                document.querySelectorAll('input[name="poses"]:checked').forEach(checkbox => {
+                    selectedPoses.push(checkbox.value);
+                });
+                
+                if (selectedPoses.length === 0) {
+                    statusMessage.textContent = 'Please select at least one pose';
+                    statusMessage.style.display = 'block';
+                    statusMessage.classList.add('error-message');
+                    return;
+                }
+                
+                // Start generation process
+                generateBtn.disabled = true;
+                spinner.style.display = 'block';
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = 'Preparing sprite sheet generation...';
+                statusMessage.classList.remove('error-message');
+                
+                // Clear previous results
+                progressItems.innerHTML = '';
+                progressSection.style.display = 'block';
+                spriteSheetContainer.style.display = 'none';
+                
+                // Create progress items for each pose
+                selectedPoses.forEach((pose, index) => {
+                    const progressItem = document.createElement('div');
+                    progressItem.className = 'progress-item';
+                    progressItem.id = `progress-${index}`;
+                    progressItem.innerHTML = `
+                        <div class="spinner" style="display: block; margin: 10px auto; width: 20px; height: 20px;"></div>
+                        <p>${pose}</p>
+                    `;
+                    progressItems.appendChild(progressItem);
+                });
+                
+                // Determine the reference image source
+                let referenceImageData = null;
+                let referenceImageUrl = null;
+                
+                if (spriteUpload.files.length > 0) {
+                    // Use the uploaded file
+                    const file = spriteUpload.files[0];
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        // Start generation with the uploaded image
+                        referenceImageData = e.target.result;
+                        startSpriteSheetGeneration(selectedPoses, description, referenceImageData);
+                    };
+                    
+                    reader.readAsDataURL(file);
+                } else if (refImageUrl) {
+                    // Use the reference image from URL params
+                    referenceImageUrl = refImageUrl;
+                    startSpriteSheetGeneration(selectedPoses, description, null, referenceImageUrl);
+                } else {
+                    // Generate from description only
+                    startSpriteSheetGeneration(selectedPoses, description, null, null);
+                }
+            });
+            
+            // Function to start the sprite sheet generation process
+            function startSpriteSheetGeneration(poses, description, imageData, imageUrl) {
+                statusMessage.textContent = `Generating ${poses.length} sprite poses...`;
+                
+                // Initial request to prepare the sprite sheet generation
+                const requestData = {
+                    poses: poses,
+                    description: description,
+                    image_data: imageData,
+                    image_url: imageUrl
+                };
+                
+                // Send request to start generation
+                fetch('/api/generate-spritesheet', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Store the session ID for checking progress
+                        const sessionId = data.session_id;
+                        
+                        // Start checking progress
+                        checkProgress(sessionId, poses);
+                    } else {
+                        // Show error
+                        spinner.style.display = 'none';
+                        statusMessage.textContent = data.error || 'Error starting sprite sheet generation';
+                        statusMessage.classList.add('error-message');
+                        generateBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    spinner.style.display = 'none';
+                    statusMessage.textContent = 'Error connecting to server';
+                    statusMessage.classList.add('error-message');
+                    generateBtn.disabled = false;
+                });
+            }
+            
+            // Function to check progress of sprite sheet generation
+            function checkProgress(sessionId, poses) {
+                fetch(`/api/spritesheet-progress?session_id=${sessionId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update progress items
+                            if (data.generated_poses) {
+                                data.generated_poses.forEach((pose, index) => {
+                                    const progressItem = document.getElementById(`progress-${index}`);
+                                    if (progressItem && pose.image_url) {
+                                        progressItem.innerHTML = `
+                                            <img src="${pose.image_url}" alt="${pose.pose}">
+                                            <p>${pose.pose}</p>
+                                        `;
+                                    }
+                                });
+                            }
+                            
+                            // Update status message
+                            statusMessage.textContent = `Generated ${data.completed}/${poses.length} poses...`;
+                            
+                            // Check if sprite sheet is ready
+                            if (data.sprite_sheet_url) {
+                                // Generation complete
+                                spinner.style.display = 'none';
+                                statusMessage.textContent = 'Sprite sheet generated successfully!';
+                                
+                                // Display the sprite sheet
+                                spriteSheetImage.src = data.sprite_sheet_url;
+                                spriteSheetContainer.style.display = 'block';
+                                
+                                // Set up download button
+                                downloadSpriteSheetBtn.onclick = function() {
+                                    const a = document.createElement('a');
+                                    a.href = data.sprite_sheet_url;
+                                    a.download = `sprite_sheet_${Date.now()}.png`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                };
+                                
+                                // Enable the generate button
+                                generateBtn.disabled = false;
+                            } else if (data.status === 'in_progress') {
+                                // Continue checking
+                                setTimeout(() => checkProgress(sessionId, poses), 2000);
+                            } else {
+                                // Error state
+                                spinner.style.display = 'none';
+                                statusMessage.textContent = data.error || 'Error generating sprite sheet';
+                                statusMessage.classList.add('error-message');
+                                generateBtn.disabled = false;
+                            }
+                        } else {
+                            // Error checking progress
+                            spinner.style.display = 'none';
+                            statusMessage.textContent = data.error || 'Error checking progress';
+                            statusMessage.classList.add('error-message');
+                            generateBtn.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        spinner.style.display = 'none';
+                        statusMessage.textContent = 'Error connecting to server';
+                        statusMessage.classList.add('error-message');
+                        generateBtn.disabled = false;
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

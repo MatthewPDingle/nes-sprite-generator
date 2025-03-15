@@ -87,7 +87,8 @@ class GeminiClient(BaseClient):
                            width: int = 16, 
                            height: int = 16, 
                            max_colors: int = 16,
-                           style: str = "2D pixel art") -> Dict[str, Any]:
+                           style: str = "2D pixel art",
+                           reference_image = None) -> Dict[str, Any]:
         """
         Generate a pixel grid representation using Gemini.
         Uses function calling for standard models, and text-based approach for thinking models.
@@ -99,6 +100,7 @@ class GeminiClient(BaseClient):
             height: Height of the pixel canvas
             max_colors: Maximum number of unique colors to use
             style: Style guide for the pixel art
+            reference_image: Optional PIL Image object to use as reference
             
         Returns:
             Dictionary containing the pixel grid, palette, and metadata
@@ -111,20 +113,20 @@ class GeminiClient(BaseClient):
         # Use a more flexible comparison to handle any variations in the model string
         if any(model_name in self.model for model_name in self.IMAGE_GENERATION_MODELS):
             logger.info(f"Using direct image generation with model: {self.model}")
-            return self._generate_with_image_generation(prompt, width, height, max_colors, style)
+            return self._generate_with_image_generation(prompt, width, height, max_colors, style, reference_image)
         
         # Check if we're using a thinking model
         is_thinking_model = "thinking" in self.model.lower()
         
         if is_thinking_model:
             # Text-based approach for thinking models (no function calling)
-            return self._generate_with_text_based_approach(prompt, width, height, max_colors, style)
+            return self._generate_with_text_based_approach(prompt, width, height, max_colors, style, reference_image)
         else:
             # Function calling approach for standard models
-            return self._generate_with_function_calling(prompt, width, height, max_colors, style)
+            return self._generate_with_function_calling(prompt, width, height, max_colors, style, reference_image)
             
     def _generate_with_image_generation(self, prompt: str, width: int, height: int, 
-                                       max_colors: int, style: str) -> Dict[str, Any]:
+                                       max_colors: int, style: str, reference_image=None) -> Dict[str, Any]:
         """
         Generate pixel art by directly requesting an image from Gemini.
         Only available with supported models.
@@ -135,6 +137,7 @@ class GeminiClient(BaseClient):
             height: Height of the pixel canvas
             max_colors: Maximum number of colors to use
             style: Style guide for the pixel art
+            reference_image: Optional PIL Image object to use as reference
             
         Returns:
             Dictionary containing the pixel grid, palette, and explanation
@@ -151,17 +154,33 @@ class GeminiClient(BaseClient):
             logger.warning("Native Google Gemini client not available. Falling back to function calling approach")
             return self._generate_with_function_calling(prompt, width, height, max_colors, style)
         
-        # Prepare the prompt for image generation - simplified to match your example
-        image_prompt = f"""Create a detailed NES-style pixel art of {prompt}.
-        
-        Make it with:
-        - Classic NES pixel art style
-        - The subject centered on a pure white background
-        - The subject large and clear (filling most of the canvas)
-        - Rich colors, highlights and shadows
-        - Small details for refined appearance
-        
-        The image must have the subject centered on a completely white background."""
+        # Prepare the prompt for image generation
+        if reference_image:
+            # If we have a reference image, modify the prompt to create a variant
+            image_prompt = f"""Create a detailed NES-style pixel art of {prompt}.
+            
+            Make it with:
+            - Classic NES pixel art style similar to the reference image
+            - The subject centered on a pure white background
+            - The subject large and clear (filling most of the canvas)
+            - Rich colors, highlights and shadows
+            - Small details for refined appearance
+            - Maintain the character's style, color palette, and key features from the reference image
+            - Create the character in the specific pose described, while keeping the visual style consistent
+            
+            The image must have the subject centered on a completely white background."""
+        else:
+            # Standard prompt without reference
+            image_prompt = f"""Create a detailed NES-style pixel art of {prompt}.
+            
+            Make it with:
+            - Classic NES pixel art style
+            - The subject centered on a pure white background
+            - The subject large and clear (filling most of the canvas)
+            - Rich colors, highlights and shadows
+            - Small details for refined appearance
+            
+            The image must have the subject centered on a completely white background."""
         
         logger.info(f"Generating image with {self.model} using native Google client")
         
@@ -189,11 +208,45 @@ class GeminiClient(BaseClient):
                 content_prompt = f"Generate an image of: {image_prompt}"
                 logger.info(f"Using content prompt: {content_prompt}")
                 
-                response = self.google_client.models.generate_content(
-                    model=model_name,
-                    contents=content_prompt,
-                    config=config
-                )
+                # Prepare request based on whether we have a reference image
+                if reference_image:
+                    # Convert reference image to format expected by Google API
+                    import io
+                    from PIL import Image
+                    
+                    logger.info("Adding reference image to request")
+                    
+                    # Convert PIL image to bytes
+                    img_byte_arr = io.BytesIO()
+                    reference_image.save(img_byte_arr, format='PNG')
+                    img_bytes = img_byte_arr.getvalue()
+                    
+                    # Create multipart content with both text and image
+                    from google.genai.types import HarmCategory, HarmBlockThreshold, Content, Part
+                    import base64
+                    
+                    # Create parts for the multimodal request
+                    parts = [
+                        Part.from_text(content_prompt),
+                        Part.from_data(image_format="png", data=img_bytes)
+                    ]
+                    
+                    # Create multimodal content object
+                    content = Content(parts=parts)
+                    
+                    # Make the request with the content
+                    response = self.google_client.models.generate_content(
+                        model=model_name,
+                        contents=content,
+                        config=config
+                    )
+                else:
+                    # Simple text-only request
+                    response = self.google_client.models.generate_content(
+                        model=model_name,
+                        contents=content_prompt,
+                        config=config
+                    )
                 
                 logger.info("Successfully received response from Gemini image generation API")
                 logger.info(f"Response structure: {dir(response)}")
@@ -292,10 +345,14 @@ class GeminiClient(BaseClient):
             pixel_grid, palette = image_to_pixel_grid(processed_image)
             
             # Return in the same format as the other generation methods
+            explanation = f"NES-style pixel art of {prompt} generated with {self.model}"
+            if reference_image:
+                explanation += " using a reference image"
+                
             return {
                 "pixel_grid": pixel_grid,
                 "palette": palette,
-                "explanation": f"NES-style pixel art of {prompt} generated with {self.model}"
+                "explanation": explanation
             }
             
         except Exception as e:
@@ -304,7 +361,7 @@ class GeminiClient(BaseClient):
             logger.warning(f"Falling back to function calling approach")
             return self._generate_with_function_calling(prompt, width, height, max_colors, style)
             
-    def _generate_with_function_calling(self, prompt, width, height, max_colors, style):
+    def _generate_with_function_calling(self, prompt, width, height, max_colors, style, reference_image=None):
         """Generate pixel art using function calling (for standard models)."""
         # Define the function to call
         functions = [
@@ -381,19 +438,39 @@ class GeminiClient(BaseClient):
         """
         
         # Prepare user message
-        user_content = f"""Create a {width}x{height} pixel art of: {prompt}
-        
-        IMPORTANT REQUIREMENTS:
-        1. Create an image EXACTLY {width} pixels wide by {height} pixels tall.
-        2. Make the subject LARGE - it should fill most of the canvas.
-        3. Use rich colors and subtle gradients to create depth and texture.
-        4. Add highlights and shadows to give dimension, not flat colors.
-        5. Include small details that make the pixel art feel complete and refined.
-        6. For transparency, use [0,0,0,0] as the RGBA value.
-        7. Your explanation must be extremely short (under 150 characters).
-        
-        Your goal is to create rich, detailed pixel art that makes maximum use of the limited canvas.
-        Don't create tiny sprites with lots of empty space around them."""
+        if reference_image:
+            # Add reference image guidance to the prompt
+            user_content = f"""Create a {width}x{height} pixel art of: {prompt}
+
+            This should be a variation of an existing character/sprite, maintaining the same style and key features
+            but in a different pose or orientation.
+
+            IMPORTANT REQUIREMENTS:
+            1. Create an image EXACTLY {width} pixels wide by {height} pixels tall.
+            2. Make the subject LARGE - it should fill most of the canvas.
+            3. Use rich colors and subtle gradients to create depth and texture.
+            4. Add highlights and shadows to give dimension, not flat colors.
+            5. Include small details that make the pixel art feel complete and refined.
+            6. For transparency, use [0,0,0,0] as the RGBA value.
+            7. Your explanation must be extremely short (under 150 characters).
+            8. MAINTAIN the character's style, color palette and key features.
+            
+            Your goal is to create a variant pose while keeping the consistent visual identity.
+            Don't create tiny sprites with lots of empty space around them."""
+        else:
+            user_content = f"""Create a {width}x{height} pixel art of: {prompt}
+            
+            IMPORTANT REQUIREMENTS:
+            1. Create an image EXACTLY {width} pixels wide by {height} pixels tall.
+            2. Make the subject LARGE - it should fill most of the canvas.
+            3. Use rich colors and subtle gradients to create depth and texture.
+            4. Add highlights and shadows to give dimension, not flat colors.
+            5. Include small details that make the pixel art feel complete and refined.
+            6. For transparency, use [0,0,0,0] as the RGBA value.
+            7. Your explanation must be extremely short (under 150 characters).
+            
+            Your goal is to create rich, detailed pixel art that makes maximum use of the limited canvas.
+            Don't create tiny sprites with lots of empty space around them."""
         
         # Assemble messages
         messages = [
@@ -448,7 +525,7 @@ class GeminiClient(BaseClient):
                 
             raise
             
-    def _generate_with_text_based_approach(self, prompt, width, height, max_colors, style):
+    def _generate_with_text_based_approach(self, prompt, width, height, max_colors, style, reference_image=None):
         """Generate pixel art using a text-based approach (for thinking models)."""
         import re
         

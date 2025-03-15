@@ -402,9 +402,21 @@
                                     document.body.removeChild(a);
                                 };
                                 
+                                // Add sprite sheet button
+                                const spriteSheetBtn = document.createElement('button');
+                                spriteSheetBtn.className = 'download-btn';
+                                spriteSheetBtn.style.marginTop = '5px';
+                                spriteSheetBtn.style.backgroundColor = '#007000';
+                                spriteSheetBtn.textContent = 'GENERATE SPRITE SHEET';
+                                spriteSheetBtn.onclick = function() {
+                                    const description = document.getElementById('prompt').value;
+                                    window.location.href = `/spritesheet?image=${encodeURIComponent(imageUrl)}&description=${encodeURIComponent(description)}`;
+                                };
+                                
                                 // Add to DOM
                                 placeholder.appendChild(img);
                                 placeholder.appendChild(downloadBtn);
+                                placeholder.appendChild(spriteSheetBtn);
                             } else {
                                 // Create error message for failed generation
                                 const errorMsg = document.createElement('div');
