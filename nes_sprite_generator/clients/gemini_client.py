@@ -2,8 +2,19 @@
 import json
 import logging
 from typing import Dict, Any, Optional
+import base64
+import io
 
+# Import both OpenAI and Google Gemini libraries
 import openai
+try:
+    from google import genai
+    from google.genai.types import GenerateContentConfig
+    GOOGLE_API_AVAILABLE = True
+except ImportError:
+    GOOGLE_API_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Google Gemini API libraries not found. Install with: pip install google-genai")
 
 from .base import BaseClient
 from ..config import get_api_key
@@ -38,14 +49,24 @@ class GeminiClient(BaseClient):
         logger.info(f"Image generation models: {self.IMAGE_GENERATION_MODELS}")
         
         # Check for image generation capability
-        supports_image_gen = any(gen_model in model for gen_model in self.IMAGE_GENERATION_MODELS)
-        logger.info(f"Model supports image generation: {supports_image_gen}")
+        self.supports_image_gen = any(gen_model in model for gen_model in self.IMAGE_GENERATION_MODELS)
+        logger.info(f"Model supports image generation: {self.supports_image_gen}")
         
-        # Use OpenAI client configured to use Google's Gemini endpoints
+        # Use OpenAI client configured to use Google's Gemini endpoints for standard functions
         self.client = openai.OpenAI(
             api_key=self.api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
+        
+        # Set up native Google client for image generation if needed and available
+        self.google_client = None
+        if self.supports_image_gen and GOOGLE_API_AVAILABLE:
+            try:
+                self.google_client = genai.Client(api_key=self.api_key)
+                logger.info("Successfully initialized native Google Gemini client")
+            except Exception as e:
+                logger.error(f"Failed to initialize native Google Gemini client: {e}")
+                logger.warning("Image generation functionality may be limited")
         
         # Handle thinking mode for flash-thinking model
         self.thinking_level = None
@@ -120,10 +141,14 @@ class GeminiClient(BaseClient):
         """
         try:
             from ..image_utils import process_raw_image, image_to_pixel_grid
-            import base64
         except ImportError as e:
             logger.error(f"Failed to import required modules for image generation: {e}")
             logger.warning("Falling back to function calling approach")
+            return self._generate_with_function_calling(prompt, width, height, max_colors, style)
+        
+        # Check if we have the native Google client available
+        if not GOOGLE_API_AVAILABLE or not self.google_client:
+            logger.warning("Native Google Gemini client not available. Falling back to function calling approach")
             return self._generate_with_function_calling(prompt, width, height, max_colors, style)
         
         # Prepare the prompt for image generation
@@ -140,82 +165,41 @@ class GeminiClient(BaseClient):
         The subject should be the clear focus, centered on a pure white background.
         """
         
-        logger.info(f"Generating image with {self.model} for prompt: {prompt}")
+        logger.info(f"Generating image with {self.model} using native Google client")
         
         try:
-            # Make the API call with direct parameters for image generation
-            logger.info("Making API call to Gemini for direct image generation")
-            
+            # Use the native Google client with the correct parameters based on documentation
             try:
-                # Based on the error message, the config parameter is not supported in this client
-                # Try using parameters directly at the top level
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": image_prompt}],
+                # Create the configuration for image generation
+                config = GenerateContentConfig(
                     response_modalities=["IMAGE"],
-                    temperature=0.7,  # Adjust as needed
-                    max_tokens=1024
+                    temperature=0.7
                 )
-                logger.info(f"Made API call to {self.model} with response_modalities parameter")
-            except Exception as e:
-                logger.warning(f"Error using response_modalities: {e}")
                 
-                # Try alternative approach with a special system message
-                try:
-                    logger.info("Trying alternative approach with system message")
-                    response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=[
-                            {"role": "system", "content": "You can create images. Always respond with an image for visual prompts."},
-                            {"role": "user", "content": f"Create an image: {image_prompt}"}
-                        ],
-                        temperature=0.7,
-                        max_tokens=1024
-                    )
-                except Exception as e2:
-                    logger.error(f"Alternative approach also failed: {e2}")
-                    logger.warning("Falling back to function calling approach")
+                # Make the API call
+                response = self.google_client.models.generate_content(
+                    model=self.model,
+                    contents=f"Generate an image of {image_prompt}",
+                    config=config
+                )
+                
+                logger.info("Successfully received response from Gemini image generation API")
+                
+                # Check if we have images in the response
+                if not hasattr(response, 'images') or not response.images:
+                    logger.warning("No images found in response")
                     return self._generate_with_function_calling(prompt, width, height, max_colors, style)
                 
-            logger.info("Successfully received response from Gemini image generation API")
-            
-            # Check if we have an image in the response - examine all possible attributes
-            logger.info(f"Response structure: {dir(response)}")
-            
-            # Get image data - try different attributes that might hold the image
-            image_data = None
-            
-            # Try different possible attributes
-            if hasattr(response, 'images') and response.images:
-                logger.info("Found 'images' attribute in response")
-                image_data = response.images[0].image_data if hasattr(response.images[0], 'image_data') else None
-            
-            # Try content field for multimodal response
-            if not image_data and hasattr(response, 'choices') and response.choices:
-                logger.info("Looking in 'choices' attribute for image content")
-                choice = response.choices[0]
-                if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
-                    content = choice.message.content
-                    logger.info(f"Content type: {type(content)}")
-                    
-                    # If content is a list, look for image parts
-                    if isinstance(content, list):
-                        for part in content:
-                            if hasattr(part, 'type') and part.type == 'image':
-                                if hasattr(part, 'image_data') or hasattr(part, 'data'):
-                                    image_data = getattr(part, 'image_data', None) or getattr(part, 'data', None)
-                                    logger.info("Found image in multimodal content")
-                                    break
-            
-            # If we still don't have an image, fall back
-            if not image_data:
-                logger.warning("No image was returned by the Gemini model - falling back to function calling")
+                # Get the image data
+                image_data = response.images[0].image_data
+                logger.info("Successfully extracted image data from response")
+                
+            except Exception as e:
+                logger.error(f"Error using native Google client: {e}")
+                logger.warning("Falling back to function calling approach")
                 return self._generate_with_function_calling(prompt, width, height, max_colors, style)
             
-            logger.info("Successfully extracted image data from response")
-            
-            logger.info(f"Received image from {self.model}, processing...")
-            
+            # Process the image through our workflow
             try:
                 # Process the image according to our NES sprite workflow
                 processed_image = process_raw_image(
