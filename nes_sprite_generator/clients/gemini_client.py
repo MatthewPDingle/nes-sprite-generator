@@ -33,6 +33,14 @@ class GeminiClient(BaseClient):
         self.api_key = api_key or get_api_key("google")
         self.model = model
         
+        # Log model details for debugging
+        logger.info(f"GeminiClient initialized with model string: '{model}'")
+        logger.info(f"Image generation models: {self.IMAGE_GENERATION_MODELS}")
+        
+        # Check for image generation capability
+        supports_image_gen = any(gen_model in model for gen_model in self.IMAGE_GENERATION_MODELS)
+        logger.info(f"Model supports image generation: {supports_image_gen}")
+        
         # Use OpenAI client configured to use Google's Gemini endpoints
         self.client = openai.OpenAI(
             api_key=self.api_key,
@@ -79,7 +87,8 @@ class GeminiClient(BaseClient):
             raise ValueError(f"Invalid dimensions: {width}x{height}. Both width and height must be positive integers.")
         
         # Check if this is a model with direct image generation capability
-        if self.model in self.IMAGE_GENERATION_MODELS:
+        # Use a more flexible comparison to handle any variations in the model string
+        if any(model_name in self.model for model_name in self.IMAGE_GENERATION_MODELS):
             logger.info(f"Using direct image generation with model: {self.model}")
             return self._generate_with_image_generation(prompt, width, height, max_colors, style)
         
@@ -109,8 +118,13 @@ class GeminiClient(BaseClient):
         Returns:
             Dictionary containing the pixel grid, palette, and explanation
         """
-        from ..image_utils import process_raw_image, image_to_pixel_grid
-        import base64
+        try:
+            from ..image_utils import process_raw_image, image_to_pixel_grid
+            import base64
+        except ImportError as e:
+            logger.error(f"Failed to import required modules for image generation: {e}")
+            logger.warning("Falling back to function calling approach")
+            return self._generate_with_function_calling(prompt, width, height, max_colors, style)
         
         # Prepare the prompt for image generation
         image_prompt = f"""Generate an NES-style pixel art of: {prompt}
@@ -129,38 +143,95 @@ class GeminiClient(BaseClient):
         logger.info(f"Generating image with {self.model} for prompt: {prompt}")
         
         try:
-            # Make the API call with the response_modalities parameter set to ["IMAGE"]
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "user", "content": image_prompt}
-                ],
-                # Specify we want an image response
-                config={
-                    "response_modalities": ["IMAGE"],
-                    "safety_settings": {"HARM_CATEGORY_VISUAL": "BLOCK_ONLY_HIGH"}
-                }
-            )
+            # Make the API call with direct parameters for image generation
+            logger.info("Making API call to Gemini for direct image generation")
             
-            # Check if we have an image in the response
-            if not hasattr(response, 'images') or not response.images:
-                raise ValueError("No image was returned by the Gemini model")
+            try:
+                # Based on the error message, the config parameter is not supported in this client
+                # Try using parameters directly at the top level
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": image_prompt}],
+                    response_modalities=["IMAGE"],
+                    temperature=0.7,  # Adjust as needed
+                    max_tokens=1024
+                )
+                logger.info(f"Made API call to {self.model} with response_modalities parameter")
+            except Exception as e:
+                logger.warning(f"Error using response_modalities: {e}")
+                
+                # Try alternative approach with a special system message
+                try:
+                    logger.info("Trying alternative approach with system message")
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": "You can create images. Always respond with an image for visual prompts."},
+                            {"role": "user", "content": f"Create an image: {image_prompt}"}
+                        ],
+                        temperature=0.7,
+                        max_tokens=1024
+                    )
+                except Exception as e2:
+                    logger.error(f"Alternative approach also failed: {e2}")
+                    logger.warning("Falling back to function calling approach")
+                    return self._generate_with_function_calling(prompt, width, height, max_colors, style)
+                
+            logger.info("Successfully received response from Gemini image generation API")
             
-            # Get the first image
-            image_data = response.images[0].image_data
+            # Check if we have an image in the response - examine all possible attributes
+            logger.info(f"Response structure: {dir(response)}")
+            
+            # Get image data - try different attributes that might hold the image
+            image_data = None
+            
+            # Try different possible attributes
+            if hasattr(response, 'images') and response.images:
+                logger.info("Found 'images' attribute in response")
+                image_data = response.images[0].image_data if hasattr(response.images[0], 'image_data') else None
+            
+            # Try content field for multimodal response
+            if not image_data and hasattr(response, 'choices') and response.choices:
+                logger.info("Looking in 'choices' attribute for image content")
+                choice = response.choices[0]
+                if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                    content = choice.message.content
+                    logger.info(f"Content type: {type(content)}")
+                    
+                    # If content is a list, look for image parts
+                    if isinstance(content, list):
+                        for part in content:
+                            if hasattr(part, 'type') and part.type == 'image':
+                                if hasattr(part, 'image_data') or hasattr(part, 'data'):
+                                    image_data = getattr(part, 'image_data', None) or getattr(part, 'data', None)
+                                    logger.info("Found image in multimodal content")
+                                    break
+            
+            # If we still don't have an image, fall back
+            if not image_data:
+                logger.warning("No image was returned by the Gemini model - falling back to function calling")
+                return self._generate_with_function_calling(prompt, width, height, max_colors, style)
+            
+            logger.info("Successfully extracted image data from response")
             
             logger.info(f"Received image from {self.model}, processing...")
             
-            # Process the image according to our NES sprite workflow
-            processed_image = process_raw_image(
-                image_data=image_data,
-                target_width=width,
-                target_height=height,
-                max_colors=max_colors,
-                white_tolerance=10,  # Adjust tolerance for background removal if needed
-                save_steps=True,
-                output_prefix=f"gemini_{self.model}_prompt_{prompt[:20].replace(' ', '_')}"
-            )
+            try:
+                # Process the image according to our NES sprite workflow
+                processed_image = process_raw_image(
+                    image_data=image_data,
+                    target_width=width,
+                    target_height=height,
+                    max_colors=max_colors,
+                    white_tolerance=10,  # Adjust tolerance for background removal if needed
+                    save_steps=True,
+                    output_prefix=f"gemini_{self.model.replace('-', '_')}_prompt_{prompt[:20].replace(' ', '_').replace('/', '_')}"
+                )
+                logger.info("Successfully processed the image through the NES workflow")
+            except Exception as e:
+                logger.error(f"Error processing the image: {e}")
+                logger.warning("Falling back to function calling approach")
+                return self._generate_with_function_calling(prompt, width, height, max_colors, style)
             
             # Convert the processed image to a pixel grid and palette
             pixel_grid, palette = image_to_pixel_grid(processed_image)
