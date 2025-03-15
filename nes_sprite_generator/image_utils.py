@@ -236,8 +236,8 @@ def crop_resize_and_center(
     
     logger.info(f"Resized dimensions: {new_width}x{new_height} (scale ratio: {scale_ratio:.3f})")
     
-    # Resize using nearest neighbor to maintain pixel art quality
-    resized = content.resize((new_width, new_height), Image.NEAREST)
+    # Resize using bilinear sampling instead of nearest neighbor
+    resized = content.resize((new_width, new_height), Image.BILINEAR)
     
     # Create a new transparent canvas of the target size
     canvas = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
