@@ -224,17 +224,21 @@ def process_sprite_sheet(session_id, poses, description, image_data, image_url):
             except Exception as e:
                 logger.error(f"Error downloading reference image: {e}")
         
-        # Extract the color palette from the reference image if available
+        # Initialize reference dimensions and palette with defaults
+        reference_width, reference_height = 16, 24  # Default sprite dimensions
         reference_palette = None
+        
+        # Extract the color palette and dimensions from the reference image if available
         if reference_image:
+            # Always capture dimensions, even if palette extraction fails
+            reference_width, reference_height = reference_image.size
+            logger.info(f"Reference image dimensions: {reference_width}x{reference_height}")
+            
             try:
                 from ..image_utils import image_to_pixel_grid
                 pixel_grid, palette = image_to_pixel_grid(reference_image)
                 reference_palette = palette
                 logger.info(f"Extracted palette with {len(palette)} colors")
-                
-                # Save reference image dimensions
-                reference_width, reference_height = reference_image.size
             except Exception as e:
                 logger.error(f"Error extracting palette: {e}")
         
@@ -251,7 +255,11 @@ def process_sprite_sheet(session_id, poses, description, image_data, image_url):
                 session['generated_poses'][i]['status'] = 'generating'
                 
                 # Create the prompt for the pose
-                pose_prompt = f"{description} in a {pose} pose with a white background."
+                if reference_image:
+                    # Enhanced prompt for reference-based generation
+                    pose_prompt = f"Create the exact same character as shown in the reference image, but in a {pose} pose. Maintain the character's appearance, style, colors, and visual characteristics. {description} with a white background."
+                else:
+                    pose_prompt = f"{description} in a {pose} pose with a white background."
                 
                 # Generate the sprite using the gemini-2.0-flash-exp model
                 # First, set output filename for this pose
