@@ -1,6 +1,6 @@
 from .generator import PixelArtGenerator
 
-def generate_sprite(prompt, width=16, height=24, colors=32, model="gpt-4o", output=None, style="2D pixel art", scale=1, post_process=True, resize_method="nearest"):
+def generate_sprite(prompt, width=16, height=24, colors=32, model="gemini-2.0-flash-exp", output=None, style="2D pixel art", scale=1, post_process=True, resize_method="bilinear"):
     """
     API function to generate a sprite, usable from both CLI and web.
     

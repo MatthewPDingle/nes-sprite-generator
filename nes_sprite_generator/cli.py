@@ -255,10 +255,10 @@ def main():
     single_parser.add_argument("--colors", type=int, default=16, help="Maximum number of colors")
     single_parser.add_argument("--style", type=str, default="2D pixel art", help="Style guide")
     single_parser.add_argument("--output", type=str, default="pixel_art.png", help="Output file name")
-    single_parser.add_argument("--model", type=str, default="gpt-4o", help="AI model to use")
+    single_parser.add_argument("--model", type=str, default="gemini-2.0-flash-exp", help="AI model to use")
     single_parser.add_argument("--versions", type=int, default=1, help="Number of versions to generate")
     single_parser.add_argument("--no-post-process", action="store_true", help="Disable automatic post-processing of the image to fit content to desired dimensions")
-    single_parser.add_argument("--resize-method", type=str, default="nearest", 
+    single_parser.add_argument("--resize-method", type=str, default="bilinear", 
                               choices=["nearest", "bilinear", "bicubic", "lanczos"], 
                               help="Method to use for resizing during post-processing")
     single_parser.add_argument("--max-workers", type=int, default=None, 

@@ -34,7 +34,7 @@ def rgba_to_hex(rgba):
 class PixelArtGenerator:
     """Class for generating pixel art using AI models."""
     
-    def __init__(self, model: str = "gpt-4o", api_key: Optional[str] = None):
+    def __init__(self, model: str = "gemini-2.0-flash-exp", api_key: Optional[str] = None):
         """
         Initialize the pixel art generator.
         

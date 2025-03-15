@@ -23,7 +23,10 @@ pip install -e .
 
 ```bash
 # Generate a single sprite
-nes-sprite-generator single "A warrior with sword and shield" --width 16 --height 24 --colors 32 --model "claude-3-7-sonnet-low"
+nes-sprite-generator single "A warrior with sword and shield" --width 16 --height 24 --colors 32
+
+# Use a different model
+nes-sprite-generator single "A ninja character" --model "claude-3-7-sonnet-low"
 
 # List available models
 nes-sprite-generator models
@@ -34,8 +37,9 @@ Options:
 - `--height`: Height of sprite in pixels (default: 16)
 - `--colors`: Maximum colors in palette (default: 16)
 - `--style`: Style description (default: "2D pixel art")
-- `--model`: AI model to use (default: "gpt-4o")
+- `--model`: AI model to use (default: "gemini-2.0-flash-exp")
 - `--versions`: Number of versions to generate (default: 1)
+- `--resize-method`: Method for resizing (default: "bilinear")
 - `--output`: Output filename (default: "pixel_art.png")
 
 ## Web Interface
@@ -60,8 +64,16 @@ result = generate_sprite(
     width=16, 
     height=24, 
     colors=32, 
-    model="gpt-4o",
     output="ninja.png"
+)
+
+# Generate using a different model
+result = generate_sprite(
+    prompt="A spaceship", 
+    width=32, 
+    height=32,
+    model="claude-3-7-sonnet-low",
+    output="spaceship.png"
 )
 
 # Get available models

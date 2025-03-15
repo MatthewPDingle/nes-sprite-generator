@@ -71,7 +71,7 @@ AVAILABLE_MODELS = {
     
     # Google Gemini models
     "gemini-2.0-flash": "Google Gemini 2.0 Flash - fast responses (supports function calling)",
-    "gemini-2.0-flash-exp": "Google Gemini 2.0 Flash Experimental - bleeding edge features",
+    "gemini-2.0-flash-exp": "Google Gemini 2.0 Flash Experimental - direct image generation capability",
     "gemini-2.0-pro-exp-02-05": "Google Gemini 2.0 Pro - more advanced reasoning (supports function calling)",
     "gemini-2.0-flash-thinking-exp-01-21": "Google Gemini 2.0 Flash with enhanced thinking capabilities (text-based approach)"
 }
