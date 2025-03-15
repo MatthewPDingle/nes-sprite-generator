@@ -348,8 +348,8 @@ def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: i
     
     logger.info(f"Clustering {len(lab_values)} non-transparent pixels in LAB color space")
     
-    # Perform k-means clustering in LAB space
-    kmeans = KMeans(n_clusters=max_colors, random_state=42, n_init=10)
+    # Perform k-means clustering in LAB space with controlled parallelism
+    kmeans = KMeans(n_clusters=max_colors, random_state=42, n_init=10, n_jobs=1)
     kmeans.fit(lab_values)
     
     # Get cluster centers and convert back to RGB
