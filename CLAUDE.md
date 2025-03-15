@@ -9,7 +9,8 @@
 - Web interface: `python run_webapp.py` (access at http://localhost:5000)
 
 ## Development
-- Install: `pip install -e .` (editable mode)
+- Basic install: `pip install -e .` (editable mode)
+- Enhanced install: `pip install -e ".[enhanced]"` (includes advanced color processing)
 - Environment setup: Create a `.env` file with API keys for OpenAI, Anthropic, and/or Google
 
 ## Code Style Guidelines

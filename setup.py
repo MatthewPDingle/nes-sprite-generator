@@ -11,6 +11,12 @@ setup(
         "google-generativeai",
         "flask",
     ],
+    extras_require={
+        "enhanced": [
+            "opencv-python",
+            "scikit-learn",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "nes-sprite-generator=nes_sprite_generator.cli:main",

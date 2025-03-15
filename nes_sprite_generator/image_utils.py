@@ -255,7 +255,9 @@ def crop_resize_and_center(
 
 def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: int = 128) -> Image.Image:
     """
-    Reduce the number of colors in an image to the specified maximum.
+    Reduce the number of colors in an image to the specified maximum using K-means clustering
+    in CIELAB color space for perceptually accurate color quantization.
+    
     Handle transparency as follows:
     - Convert pixels with alpha < threshold to fully transparent
     - Convert pixels with alpha >= threshold to fully opaque
@@ -264,6 +266,121 @@ def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: i
         image: The PIL Image object
         max_colors: Maximum number of colors allowed
         transparency_threshold: Alpha threshold (pixels below become transparent, above become opaque)
+        
+    Returns:
+        A new image with reduced color palette
+    """
+    try:
+        import cv2
+        import numpy as np
+        from sklearn.cluster import KMeans
+    except ImportError:
+        logger.warning("Required dependencies (opencv-python, scikit-learn) not found. "
+                      "Falling back to basic color quantization. "
+                      "Install with: pip install opencv-python scikit-learn")
+        return _reduce_colors_basic(image, max_colors, transparency_threshold)
+    
+    # Convert to RGBA mode to properly handle transparency
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+    
+    # Process pixels based on transparency
+    pixels = image.load()
+    width, height = image.size
+    
+    # Create a copy to work with
+    processed_image = image.copy()
+    processed_pixels = processed_image.load()
+    
+    # Process transparency - make pixels either fully transparent or fully opaque
+    transparent_count = 0
+    opaque_count = 0
+    
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = pixels[x, y]
+            if a < transparency_threshold:
+                # Make fully transparent
+                processed_pixels[x, y] = (0, 0, 0, 0)
+                transparent_count += 1
+            else:
+                # Make fully opaque
+                processed_pixels[x, y] = (r, g, b, 255)
+                opaque_count += 1
+    
+    logger.info(f"Transparency processing: {transparent_count} pixels made transparent, {opaque_count} made opaque")
+    
+    # Count unique colors (ignoring transparent pixels)
+    unique_colors = set()
+    for y in range(height):
+        for x in range(width):
+            pixel = processed_pixels[x, y]
+            if pixel[3] > 0:  # Not transparent
+                unique_colors.add(pixel[:3])  # Add RGB (ignore alpha)
+    
+    current_colors = len(unique_colors)
+    logger.info(f"Current unique colors after transparency processing: {current_colors}")
+    
+    # If we're already under the limit, no need to reduce
+    if current_colors <= max_colors:
+        logger.info("No color reduction needed")
+        return processed_image
+    
+    # Convert PIL Image to NumPy array
+    img_array = np.array(processed_image)
+    
+    # Create a boolean mask for non-transparent pixels
+    alpha_mask = img_array[:, :, 3] > 0
+    
+    # Extract RGB values of non-transparent pixels
+    rgb_values = img_array[alpha_mask, :3]
+    
+    # Create a position map to track where each non-transparent pixel is located
+    positions = []
+    for y in range(height):
+        for x in range(width):
+            if processed_pixels[x, y][3] > 0:  # Not transparent
+                positions.append((y, x))
+    
+    # Convert RGB to LAB color space
+    rgb_values_float = rgb_values.astype(np.float32) / 255.0
+    lab_values = cv2.cvtColor(np.array([rgb_values_float]), cv2.COLOR_RGB2LAB)[0]
+    
+    logger.info(f"Clustering {len(lab_values)} non-transparent pixels in LAB color space")
+    
+    # Perform k-means clustering in LAB space
+    kmeans = KMeans(n_clusters=max_colors, random_state=42, n_init=10)
+    kmeans.fit(lab_values)
+    
+    # Get cluster centers and convert back to RGB
+    lab_centers = kmeans.cluster_centers_.astype(np.float32)
+    rgb_centers_float = cv2.cvtColor(np.array([lab_centers]), cv2.COLOR_LAB2RGB)[0]
+    rgb_centers = (rgb_centers_float * 255).astype(np.uint8)
+    
+    # Get labels for each pixel
+    labels = kmeans.labels_
+    
+    # Create the output image with reduced colors
+    result = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    
+    # Assign each non-transparent pixel its new color based on cluster
+    for idx, (y, x) in enumerate(positions):
+        cluster_idx = labels[idx]
+        new_color = tuple(rgb_centers[cluster_idx]) + (255,)  # Add alpha=255
+        result.putpixel((x, y), new_color)
+    
+    logger.info(f"Successfully reduced to {max_colors} colors using K-means in LAB color space")
+    
+    return result
+
+def _reduce_colors_basic(image: Image.Image, max_colors: int, transparency_threshold: int = 128) -> Image.Image:
+    """
+    Basic fallback method to reduce colors if scikit-learn or OpenCV are not available.
+    
+    Args:
+        image: The PIL Image object
+        max_colors: Maximum number of colors allowed
+        transparency_threshold: Alpha threshold
         
     Returns:
         A new image with reduced color palette
@@ -314,13 +431,6 @@ def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: i
         logger.info("No color reduction needed")
         return processed_image
     
-    # Create a mask for non-transparent pixels
-    visible_mask = Image.new("L", processed_image.size, 0)
-    for y in range(height):
-        for x in range(width):
-            if processed_pixels[x, y][3] > 0:  # Not transparent
-                visible_mask.putpixel((x, y), 255)
-    
     # Use gray background instead of black to prevent black influence
     # This will create an RGB image but ensure black isn't introduced in transparent areas
     rgb_image = Image.new("RGB", processed_image.size, (128, 128, 128))
@@ -332,7 +442,7 @@ def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: i
                 rgb_image.putpixel((x, y), processed_pixels[x, y][:3])
     
     # Quantize the colors
-    logger.info(f"Reducing to {max_colors} colors")
+    logger.info(f"Reducing to {max_colors} colors using basic quantization")
     quantized = rgb_image.quantize(colors=max_colors, method=2, dither=0)  # method=2 is FASTOCTREE
     
     # Convert back to RGBA, restoring transparency

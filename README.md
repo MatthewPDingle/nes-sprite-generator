@@ -95,3 +95,17 @@ models = list_available_models()
 - Python 3.8+
 - Pillow
 - AI API keys for the respective services
+
+### Enhanced Features
+
+Install additional dependencies for enhanced features:
+
+```bash
+# Install with enhanced color processing capabilities
+pip install -e ".[enhanced]"
+```
+
+Enhanced features include:
+- Perceptually accurate color quantization using K-means clustering in CIELAB color space
+- Better preservation of original colors when reducing color palette
+- Improved handling of color transitions and subtle hues
