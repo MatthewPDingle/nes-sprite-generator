@@ -214,7 +214,6 @@ class PixelArtGenerator:
         
         # Add debug images if requested
         if save_debug:
-            from ..image_utils import process_raw_image
             import tempfile
             from PIL import Image
             
