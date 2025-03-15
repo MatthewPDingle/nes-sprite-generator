@@ -236,7 +236,7 @@ def crop_resize_and_center(
     
     logger.info(f"Resized dimensions: {new_width}x{new_height} (scale ratio: {scale_ratio:.3f})")
     
-    # Resize using bilinear sampling instead of nearest neighbor
+    # Resize using bilinear sampling for smoother results
     resized = content.resize((new_width, new_height), Image.BILINEAR)
     
     # Create a new transparent canvas of the target size
@@ -253,68 +253,189 @@ def crop_resize_and_center(
     
     return canvas
 
-def reduce_colors(image: Image.Image, max_colors: int) -> Image.Image:
+def reduce_colors(image: Image.Image, max_colors: int, transparency_threshold: int = 128) -> Image.Image:
     """
     Reduce the number of colors in an image to the specified maximum.
+    Always includes pure black and white in the palette.
+    Converts mostly transparent pixels to fully transparent.
     
     Args:
         image: The PIL Image object
         max_colors: Maximum number of colors allowed
+        transparency_threshold: Alpha threshold below which pixels become transparent
         
     Returns:
         A new image with reduced color palette
     """
-    # Get the current number of colors
     # Convert to RGBA mode to properly handle transparency
     if image.mode != "RGBA":
         image = image.convert("RGBA")
     
-    # Count unique colors (ignoring transparent pixels)
+    # First, convert mostly transparent pixels to fully transparent
     pixels = image.load()
     width, height = image.size
-    unique_colors = set()
     
+    # Create a copy to work with
+    processed_image = image.copy()
+    processed_pixels = processed_image.load()
+    
+    # Process transparency
     for y in range(height):
         for x in range(width):
-            pixel = pixels[x, y]
+            r, g, b, a = pixels[x, y]
+            # If mostly transparent, make fully transparent
+            if a < transparency_threshold:
+                processed_pixels[x, y] = (0, 0, 0, 0)
+    
+    # Count unique colors (ignoring transparent pixels)
+    unique_colors = set()
+    for y in range(height):
+        for x in range(width):
+            pixel = processed_pixels[x, y]
             if pixel[3] > 0:  # Not transparent
                 unique_colors.add(pixel[:3])  # Add RGB (ignore alpha)
     
     current_colors = len(unique_colors)
-    logger.info(f"Current unique colors: {current_colors}")
+    logger.info(f"Current unique colors after transparency processing: {current_colors}")
     
-    # If we're already under the limit, no need to reduce
-    if current_colors <= max_colors:
-        logger.info("No color reduction needed")
-        return image
+    # If we're already under the limit after reserving space for black and white, no need to reduce
+    reserved_colors = 2  # Black and white
+    available_colors = max_colors - reserved_colors
     
-    # Create a palette image with only the visible (non-transparent) pixels
-    visible_mask = Image.new("L", image.size, 0)
+    if current_colors <= available_colors:
+        logger.info("No color reduction needed (after reserving black and white)")
+        # Still need to ensure black and white are in palette
+        return _ensure_black_white_in_palette(processed_image, max_colors)
     
+    # Create a mask for non-transparent pixels
+    visible_mask = Image.new("L", processed_image.size, 0)
     for y in range(height):
         for x in range(width):
-            if pixels[x, y][3] > 0:  # Not transparent
+            if processed_pixels[x, y][3] > 0:  # Not transparent
                 visible_mask.putpixel((x, y), 255)
     
-    # Prepare a new RGB image with non-transparent parts of the original
-    rgb_image = Image.new("RGB", image.size, (0, 0, 0))
-    
+    # Prepare a new RGB image with non-transparent parts
+    rgb_image = Image.new("RGB", processed_image.size, (0, 0, 0))
     for y in range(height):
         for x in range(width):
-            if pixels[x, y][3] > 0:  # Not transparent
-                rgb_image.putpixel((x, y), pixels[x, y][:3])
+            if processed_pixels[x, y][3] > 0:  # Not transparent
+                rgb_image.putpixel((x, y), processed_pixels[x, y][:3])
+    
+    # Ensure we have enough room for black and white plus at least one other color
+    adjusted_max_colors = min(max_colors, current_colors + reserved_colors)
+    logger.info(f"Reducing to {adjusted_max_colors} colors (including reserved colors)")
     
     # Quantize the colors
-    logger.info(f"Reducing colors to {max_colors}")
-    quantized = rgb_image.quantize(colors=max_colors, method=2, dither=0)  # method=2 is FASTOCTREE
+    quantized = rgb_image.quantize(colors=adjusted_max_colors, method=2, dither=0)  # method=2 is FASTOCTREE
     
     # Convert back to RGBA, restoring transparency
     result = quantized.convert("RGBA")
     
+    # Restore transparency
     for y in range(height):
         for x in range(width):
-            if pixels[x, y][3] == 0:  # Was transparent
+            if processed_pixels[x, y][3] == 0:  # Fully transparent in processed image
                 result.putpixel((x, y), (0, 0, 0, 0))
+    
+    # Ensure black and white are in the palette
+    return _ensure_black_white_in_palette(result, max_colors)
+
+def _ensure_black_white_in_palette(image: Image.Image, max_colors: int) -> Image.Image:
+    """
+    Ensures that pure black and white are in the image's palette.
+    If necessary, replaces colors that are close to black or white.
+    
+    Args:
+        image: The PIL Image object
+        max_colors: Maximum color limit
+        
+    Returns:
+        Image with black and white in palette
+    """
+    BLACK = (0, 0, 0, 255)
+    WHITE = (255, 255, 255, 255)
+    
+    # Work with a copy
+    result = image.copy()
+    pixels = result.load()
+    width, height = result.size
+    
+    # Check if black and white already exist in the image
+    has_black = False
+    has_white = False
+    closest_to_black = None
+    closest_to_white = None
+    min_black_distance = float('inf')
+    min_white_distance = float('inf')
+    
+    # Count occurrences of each color
+    color_count = {}
+    for y in range(height):
+        for x in range(width):
+            pixel = pixels[x, y]
+            if pixel[3] == 0:  # Skip transparent pixels
+                continue
+                
+            # Check for exact black or white
+            if pixel[:3] == BLACK[:3]:
+                has_black = True
+            elif pixel[:3] == WHITE[:3]:
+                has_white = True
+                
+            # Track color occurrences
+            color_key = pixel[:3]
+            if color_key in color_count:
+                color_count[color_key] += 1
+            else:
+                color_count[color_key] = 1
+                
+            # Calculate distance to black and white
+            r, g, b, a = pixel
+            # Simple Euclidean distance in RGB space
+            black_distance = (r**2 + g**2 + b**2)**0.5
+            white_distance = ((255-r)**2 + (255-g)**2 + (255-b)**2)**0.5
+            
+            # Update closest colors
+            if black_distance < min_black_distance:
+                min_black_distance = black_distance
+                closest_to_black = (r, g, b, a)
+                
+            if white_distance < min_white_distance:
+                min_white_distance = white_distance
+                closest_to_white = (r, g, b, a)
+    
+    logger.info(f"Has black: {has_black}, Has white: {has_white}")
+    
+    # Add black and white if missing
+    # Strategy: Replace dark colors with black and light colors with white
+    # Usually preserving occurrence counts - replace the least common close colors
+    
+    # Sort colors by occurrence (least common first)
+    sorted_colors = sorted(color_count.items(), key=lambda x: x[1])
+    colors_to_replace = []
+    
+    if not has_black and len(sorted_colors) > 0:
+        # Find darkest color to replace
+        darkest = min(sorted_colors, key=lambda x: sum(x[0]))
+        # Add to replacement list
+        colors_to_replace.append((darkest[0], BLACK[:3]))
+        logger.info(f"Adding black by replacing color {darkest[0]}")
+        
+    if not has_white and len(sorted_colors) > 0:
+        # Find lightest color to replace
+        lightest = max(sorted_colors, key=lambda x: sum(x[0]))
+        # Add to replacement list but avoid replacing the same color twice
+        if lightest[0] != colors_to_replace[0][0] if colors_to_replace else True:
+            colors_to_replace.append((lightest[0], WHITE[:3]))
+            logger.info(f"Adding white by replacing color {lightest[0]}")
+    
+    # Apply replacements
+    for old_color, new_color in colors_to_replace:
+        for y in range(height):
+            for x in range(width):
+                r, g, b, a = pixels[x, y]
+                if (r, g, b) == old_color and a > 0:
+                    pixels[x, y] = (*new_color, a)
     
     return result
 
